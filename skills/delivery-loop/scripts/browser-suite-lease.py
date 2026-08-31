@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -8,6 +9,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+import tempfile
 
 
 EXIT_INVALID = 2
@@ -25,7 +27,8 @@ def positive_integer(value: str) -> int:
 
 
 def default_lock_file() -> Path:
-    return Path("/tmp") / f"ai-skills-browser-suite-{os.getuid()}.lock"
+    root = Path(tempfile.gettempdir()).resolve(strict=True)
+    return root / f"ai-skills-browser-suite-{os.getuid()}.lock"
 
 
 def arguments(argv: list[str]) -> argparse.Namespace:
@@ -74,16 +77,41 @@ def open_lock(path: Path) -> int:
     return descriptor
 
 
+def open_coordination_directory(path: Path) -> tuple[Path, int]:
+    try:
+        parent = path.parent.resolve(strict=True)
+    except OSError as error:
+        raise OSError(errno.ENOENT, "lock parent does not exist") from error
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(parent, flags)
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISDIR(metadata.st_mode):
+        os.close(descriptor)
+        raise OSError(errno.ENOTDIR, "lock parent is not a directory")
+    return parent / path.name, descriptor
+
+
 def acquire(descriptor: int) -> bool:
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
         return False
+
+    return True
+
+
+def write_metadata(descriptor: int) -> None:
     os.ftruncate(descriptor, 0)
     os.lseek(descriptor, 0, os.SEEK_SET)
-    os.write(descriptor, LOCK_SIGNATURE + f"{os.getpid()}\n".encode("ascii"))
+    content = LOCK_SIGNATURE + f"{os.getpid()}\n".encode("ascii")
+    written = os.write(descriptor, content)
+    if written != len(content):
+        raise OSError(errno.EIO, "short lock metadata write")
     os.fsync(descriptor)
-    return True
 
 
 def run(namespace: argparse.Namespace) -> int:
@@ -92,7 +120,7 @@ def run(namespace: argparse.Namespace) -> int:
         return EXIT_FORBIDDEN
 
     try:
-        descriptor = open_lock(namespace.lock_file)
+        lock_file, descriptor = open_coordination_directory(namespace.lock_file)
     except OSError as error:
         print(f"browser lease refused: {error.strerror}", file=sys.stderr)
         return EXIT_INVALID
@@ -106,6 +134,16 @@ def run(namespace: argparse.Namespace) -> int:
         if not acquired:
             print("browser suite lease is already held", file=sys.stderr)
             return EXIT_CONTENDED
+
+        try:
+            metadata_descriptor = open_lock(lock_file)
+            try:
+                write_metadata(metadata_descriptor)
+            finally:
+                os.close(metadata_descriptor)
+        except OSError as error:
+            print(f"browser lease refused: {error.strerror}", file=sys.stderr)
+            return EXIT_INVALID
 
         print("browser suite lease acquired", file=sys.stderr, flush=True)
         environment = os.environ.copy()

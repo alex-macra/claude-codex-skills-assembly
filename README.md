@@ -53,7 +53,7 @@ The activation hook emits matching skill names from `routing/skill-rules.json`, 
 
 Claude Code can preload the skills declared in an agent definition. Codex dispatchers must explicitly instruct each subagent to read the required `SKILL.md` files completely before acting. The agent definitions state both behaviors instead of assuming one host's preload model applies to another.
 
-The delivery-loop skill keeps resumable local state under `.codex/delivery-state/` and includes a nonblocking host-wide browser-suite lease. Browser execution defaults to one suite and one worker; repository profiles may forbid it entirely.
+The delivery-loop skill keeps resumable local state under `.codex/delivery-state/`. Its executable `scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks. The nonblocking browser helper coordinates through a stable directory lease even if its metadata file is replaced. Browser policy is `allowed` or `forbidden`; lease status is tracked separately, and execution defaults to one suite and one worker.
 
 ## Output styles
 

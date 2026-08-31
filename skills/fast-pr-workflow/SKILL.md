@@ -25,7 +25,7 @@ Prepare a focused branch and pull request without disturbing unrelated work or c
 - Assume repo changes are intentional when they fit the current task. Do not over-audit every line.
 - Prefer one focused commit for the completed task unless the user asks for multiple commits.
 - Use existing PRs/branches when present; do not create duplicates.
-- In a delivery-loop run, the primary agent remains the sole writer and all collaborators must be idle before staging.
+- In a delivery-loop run, only the writer named in the current ownership epoch may commit, push, create a PR, or edit its body. A handoff increments the epoch and makes the prior writer read-only.
 
 ## Workflow
 
@@ -48,8 +48,9 @@ Prepare a focused branch and pull request without disturbing unrelated work or c
    - if an open PR exists for the branch, update it
    - otherwise create a PR with a concise summary and validation
    - do not merge it
-7. Fetch the pushed branch and compare the full local `HEAD`, remote branch head, and PR head commit IDs. A missing or mismatched head is a failed shipping step.
-8. When delivery state exists, mirror its non-sensitive checks, blockers, browser policy, head, tree, and next gate into the PR body.
+7. Enter a shipping freeze, fetch the pushed branch, and verify the exact repository, base ref, head ref, and `OPEN` PR state. Require exactly one canonical PR for that repository, base, and head.
+8. Compare the full local `HEAD`, remote branch head, and PR head commit IDs. A missing, mismatched, duplicated, closed, or misdirected PR is a failed shipping step.
+9. When delivery state exists, mirror its non-sensitive checks, blockers, browser policy, lease status, head, tree, and next gate into the PR body. A later tracked-file fix starts a new ownership epoch and repeats verification through shipping.
 
 ## PR Body
 

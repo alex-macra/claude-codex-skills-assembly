@@ -1,6 +1,6 @@
 # Delivery checklist
 
-Use this checklist as the execution record. Create `.codex/delivery-state/<task>.md` from `delivery-state-template.md` and keep it ignored. Mirror its non-sensitive contents into the canonical PR body when a PR is available.
+Use this checklist as the execution record. Run `scripts/delivery-state.py init <task> --repository .` to create `.codex/delivery-state/<task>.md`; do not hand-create or reimplement it. Use `verify` before resume, pause, and shipping. Mirror its non-sensitive contents into the canonical PR body when a PR is available.
 
 ## User-facing status block
 
@@ -30,14 +30,14 @@ Use this checklist as the execution record. Create `.codex/delivery-state/<task>
 | Adversarial review | Reviewed diff without first-review framing. | Concrete falsification attempts and verdict recorded. | Real defect needs broader redesign or authority. | Final smoke. |
 | Final smoke | Final reviewed tree and critical path. | Fast critical path passes without tracked changes. | Smoke fails or mutates tracked state. | PR shipping. |
 | PR shipping | Authorization, green tree, idle collaborators, canonical branch and PR. | Commit pushed and one PR created or updated. | Authorization missing or repository-wide discovery is stale. | Remote-head verification. |
-| Remote-head verification | Local commit, fetched remote, canonical PR. | Full local, remote, and PR commit IDs match. | Any head is missing or differs. | Await merge. |
+| Remote-head verification | Local commit, fetched remote, canonical PR. | Exact repository, refs, open PR identity, and all three commit IDs match. | Any identity, state, count, or head differs. | Await merge. |
 | Await merge | Verified PR and handoff evidence. | PR remains open with next human gate stated. | Merge or release lacks current explicit authority. | User decision. |
 
 ## 1. Intake
 
 - Confirm the current repository, default branch, worktree, user goal, constraints, and accepted plan.
-- Name the sole writer. Other agents are read-only unless durable state records an explicit handoff.
-- Set browser policy to `allowed`, `leased`, or `forbidden`; default local capacity is one suite and one worker.
+- Name the sole writer and ownership epoch. A handoff increments the epoch and makes the prior writer read-only.
+- Set browser policy to `allowed` or `forbidden`. Separately set lease status to `not-needed`, `pending`, `held`, or `contended`; default local capacity is one suite and one worker.
 - Fetch remotes and perform repository-wide discovery of branches, worktrees, open PRs, tracked changes, and running task processes before creating a branch.
 - Reuse the canonical branch and PR. Stop on ambiguous or overlapping work.
 
@@ -55,9 +55,9 @@ Use this checklist as the execution record. Create `.codex/delivery-state/<task>
 
 ## 4. Implementation
 
-- Keep the primary agent as sole writer.
+- Keep the primary agent as sole writer in the initial ownership epoch.
 - Give parallel agents bounded read-only tasks and allowed paths.
-- QA may write only after an explicit ownership handoff; the previous writer must stop first.
+- QA or shipper may write only in a new ownership epoch that names them; the previous writer, including the primary agent, must stop first.
 - Preserve unrelated files and update durable state after material changes.
 
 ## 5. Focused verification
@@ -65,7 +65,7 @@ Use this checklist as the execution record. Create `.codex/delivery-state/<task>
 - Run the cheapest focused check first and reproduce a defect before fixing it.
 - Classify each failure as product, test, environment, or preexisting.
 - Rerun the focused check after a fix, then the broader relevant suite once.
-- Use `scripts/browser-suite-lease.py` for allowed browser work and pass its worker count to the runner. Respect `forbidden` without fallback.
+- Set lease status to `pending`, run executable `scripts/browser-suite-lease.py` for allowed browser work, then record `held` or `contended`. Pass its worker count to the runner. Respect `forbidden` with `not-needed` and no fallback.
 - Capture actual pass counts, failures, timings, and skipped checks.
 
 ## 6. Architecture and security review
@@ -92,16 +92,19 @@ Use this checklist as the execution record. Create `.codex/delivery-state/<task>
 
 - Refresh repository-wide branches, worktrees, PRs, writer, agents, processes, and diff.
 - Stage only reviewed task files; keep delivery state ignored.
-- Commit and push only with existing authorization.
+- Commit and push only with existing authorization and the current ownership epoch.
 - Create or update one canonical PR and mirror the non-sensitive state block into its body.
-- Do not merge.
+- Enter the shipping freeze before pushing. Do not merge.
 
 ## 10. Remote-head verification
 
 - Fetch the pushed branch without rebasing.
-- Resolve full commit IDs for local `HEAD`, the remote branch, and the PR head.
-- Require all three IDs to match. A stale PR, incomplete push, or local-only commit fails this phase.
+- Query the exact repository and require the recorded exact base ref, exact head ref, canonical PR number or URL, and `OPEN` state.
+- Require exactly one canonical PR for that repository, base, and head.
+- Resolve full commit IDs for local `HEAD`, the remote branch, and the PR head, and require all three to match.
+- A stale, duplicated, closed, redirected, incomplete, or local-only result fails this phase.
 - Update durable state and the PR body with the verified head and tree.
+- Keep the shipping freeze. A tracked-file fix starts a new ownership epoch at implementation and repeats all later phases.
 
 ## 11. Await merge
 
@@ -110,8 +113,8 @@ Use this checklist as the execution record. Create `.codex/delivery-state/<task>
 
 ## Pause and resume
 
-- On pause, update durable state with agents, processes, browser lease, checks, failures, blockers, and next gate. Stop or identify every live process.
-- On resume, read durable state, fetch remotes, repeat repository-wide discovery, and compare base, local, remote, PR, worktrees, and tracked changes before writing.
+- On pause, update durable state with agents, processes, browser policy, lease status, checks, failures, blockers, and next gate. Run the state helper's `verify` command, then stop or identify every live process.
+- On resume, run the state helper's `verify` command, read durable state, fetch remotes, repeat repository-wide discovery, and compare repository, base ref, head ref, local, remote, canonical PR, worktrees, and tracked changes before writing.
 - If drift is safe, record how it was reconciled. If ownership or scope is ambiguous, stop for direction.
 
 ## Retry limits

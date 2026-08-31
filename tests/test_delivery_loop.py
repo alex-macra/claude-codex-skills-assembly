@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -77,9 +78,11 @@ class DeliveryLoopContractTests(unittest.TestCase):
             "Tree",
             "Canonical PR",
             "Writer",
+            "Ownership epoch",
             "Agents",
             "Processes",
             "Browser policy",
+            "Browser lease",
             "Checks",
             "Blockers",
             "Next gate",
@@ -92,6 +95,12 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn(".codex/delivery-state/<task>.md", self.checklist)
         self.assertIn("mirror", self.checklist.lower())
         self.assertIn(".codex/delivery-state/", (ROOT / ".gitignore").read_text())
+        self.assertIn("allowed", self.checklist)
+        self.assertIn("forbidden", self.checklist)
+        self.assertIn("not-needed", self.checklist)
+        self.assertIn("pending", self.checklist)
+        self.assertIn("held", self.checklist)
+        self.assertIn("contended", self.checklist)
 
     def test_pause_resume_same_pr_and_multi_agent_prompts_route_to_delivery_loop(self) -> None:
         entries = activation.registry()
@@ -116,6 +125,16 @@ class DeliveryLoopContractTests(unittest.TestCase):
             "delivery-loop",
             activation.match_skills("continue solving the same problem", entries),
         )
+        negatives = (
+            "Explain multi-agent systems and their history",
+            "Continue this branch of the mathematical proof",
+            "Do not use multiple agents in parallel",
+            "Can you define the phrase resume this task",
+        )
+        for prompt in negatives:
+            with self.subTest(prompt=prompt):
+                self.assertIn(prompt, fixtures["negative"])
+                self.assertNotIn("delivery-loop", activation.match_skills(prompt, entries))
 
     def test_agents_describe_cross_host_skill_loading_truthfully(self) -> None:
         for path in sorted((ROOT / "agents").glob("*.md")):
@@ -140,6 +159,33 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("remote branch head", content)
         self.assertIn("PR head", content)
         self.assertIn("sole-writer ownership", content)
+        self.assertIn("ownership epoch", content)
+        self.assertNotIn("already committed branch may be pushed", content)
+
+    def test_remote_verification_requires_canonical_pr_identity_and_state(self) -> None:
+        combined = self.skill + self.checklist
+
+        self.assertIn("exact repository", combined)
+        self.assertIn("exact base ref", combined)
+        self.assertIn("exact head ref", combined)
+        self.assertIn("OPEN", combined)
+        self.assertIn("exactly one canonical PR", combined)
+        self.assertIn("shipping freeze", combined)
+
+    def test_helpers_are_directly_executable(self) -> None:
+        for name in ("browser-suite-lease.py", "delivery-state.py"):
+            path = ROOT / "skills/delivery-loop/scripts" / name
+            with self.subTest(name=name):
+                self.assertTrue(os.access(path, os.X_OK))
+                self.assertTrue(path.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n"))
+
+    def test_delivery_state_helper_is_mandatory_for_private_state(self) -> None:
+        combined = self.skill + self.checklist
+
+        self.assertIn("do not hand-create or reimplement", combined)
+        self.assertIn("rejects symlinked parents and targets", combined)
+        self.assertIn("mode `0600`", combined)
+        self.assertIn("actually ignored and untracked", combined)
 
 
 if __name__ == "__main__":

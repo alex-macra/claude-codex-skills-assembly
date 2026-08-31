@@ -251,11 +251,7 @@
           "before pr",
           "from planning to implementation",
           "work this in a loop",
-          "run the orchestrator",
-          "pause ongoing work",
-          "resume this task",
-          "multiple agents in parallel",
-          "multi-agent"
+          "run the orchestrator"
         ],
         "intentPatterns": [
           "(run|take|move).*?(through|from).*?(delivery|quality|review).*?(loop|gate|workflow)",
@@ -268,9 +264,10 @@
           "(review|adversarial review).*?(then|and).*?(smoke|smoke test)",
           "(quality|review|smoke|security|a11y|accessibility).*?(before|for).*?(PR|pr|pull request)",
           "(prepare|make|get).*?(ready).*?(PR|pr|pull request)",
-          "(pause|stop).*?(ongoing|current|this).*?(work|task|loop)",
-          "(resume|continue).*?(this|current|same).*?(task|work|loop|pull request|branch|\\b(PR|pr)\\b)",
-          "(use|run|work).*?(multiple|parallel|multi.?agent).*?(agents|tasks|work|delivery)"
+          "^(please |let.?s )?(pause|stop).*?\\b(ongoing|current|this)\\b.*?\\b(work|task|loop)\\b",
+          "^(please |let.?s )?(resume|continue).*?(\\b(task|work|loop)\\b|pull request|\\b(PR|pr)\\b)",
+          "^(please |let.?s )?(use|run) (multiple|parallel) agents( in parallel)?",
+          "^(please |let.?s )?work.*?(task|tasks|work|change|changes).*?with (multiple|parallel) agents"
         ]
       },
       "fileTriggers": {
