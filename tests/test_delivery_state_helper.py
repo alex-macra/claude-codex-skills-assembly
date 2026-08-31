@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import stat
 import subprocess
@@ -32,6 +33,15 @@ def run_helper(repository: Path, command: str, task: str) -> subprocess.Complete
         timeout=10,
         check=False,
     )
+
+
+def load_helper():
+    spec = importlib.util.spec_from_file_location("delivery_state_helper", HELPER)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class DeliveryStateHelperTests(unittest.TestCase):
@@ -225,6 +235,47 @@ class DeliveryStateHelperTests(unittest.TestCase):
 
             self.assertEqual(2, result.returncode)
             self.assertEqual(2, replacement.stat().st_nlink)
+
+    def test_verify_rejects_live_parent_replacement_during_git_check(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            initialize_repository(repository)
+            self.assertEqual(0, run_helper(repository, "init", "race-task").returncode)
+            original_codex = repository / ".codex"
+            replacement_codex = repository / "replacement-codex"
+            replacement_state = replacement_codex / "delivery-state/race-task.md"
+            replacement_state.parent.mkdir(parents=True)
+            leak = repository / "leak.md"
+            leak.write_text("leaked state\n", encoding="utf-8")
+            os.chmod(leak, 0o600)
+            os.link(leak, replacement_state)
+            helper = load_helper()
+            original_git = helper.git
+            replaced = False
+
+            def interleaving_git(
+                current_repository: Path,
+                *arguments: str,
+                identity=None,
+            ):
+                nonlocal replaced
+                result = original_git(current_repository, *arguments, identity=identity)
+                if not replaced and arguments[:1] == ("ls-files",):
+                    original_codex.rename(repository / "original-codex")
+                    replacement_codex.rename(original_codex)
+                    replaced = True
+                return result
+
+            helper.git = interleaving_git
+
+            with self.assertRaises(helper.StateError):
+                helper.execute(helper.arguments(["verify", "race-task", "--repository", str(repository)]))
+
+            self.assertTrue(replaced)
+            self.assertEqual(
+                2,
+                (repository / ".codex/delivery-state/race-task.md").stat().st_nlink,
+            )
 
     def test_verify_rejects_unignored_or_nonprivate_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

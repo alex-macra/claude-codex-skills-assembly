@@ -31,14 +31,24 @@ def arguments(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(repository), *arguments],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=False,
-    )
+def git(
+    repository: Path,
+    *arguments: str,
+    identity: StateIdentity | None = None,
+) -> subprocess.CompletedProcess[str]:
+    if identity is not None:
+        identity.assert_live()
+    try:
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    finally:
+        if identity is not None:
+            identity.assert_live()
 
 
 def repository_root(candidate: Path) -> Path:
@@ -104,28 +114,35 @@ def relative_state(task: str) -> Path:
     return Path(".codex") / "delivery-state" / f"{task}.md"
 
 
-def tracked(repository: Path, relative: Path) -> bool:
-    result = git(repository, "ls-files", "--cached", "--", relative.as_posix())
+def tracked(repository: Path, relative: Path, identity: StateIdentity | None = None) -> bool:
+    result = git(
+        repository,
+        "ls-files",
+        "--cached",
+        "--",
+        relative.as_posix(),
+        identity=identity,
+    )
     if result.returncode != 0:
         raise StateError("tracked-state check failed")
     return bool(result.stdout)
 
 
-def ignored(repository: Path, relative: Path) -> bool:
-    result = git(repository, "check-ignore", "-q", "--", relative.as_posix())
+def ignored(repository: Path, relative: Path, identity: StateIdentity | None = None) -> bool:
+    result = git(repository, "check-ignore", "-q", "--", relative.as_posix(), identity=identity)
     return result.returncode == 0
 
 
-def git_exclude_path(repository: Path) -> Path:
-    result = git(repository, "rev-parse", "--git-path", "info/exclude")
+def git_exclude_path(repository: Path, identity: StateIdentity | None = None) -> Path:
+    result = git(repository, "rev-parse", "--git-path", "info/exclude", identity=identity)
     if result.returncode != 0 or not result.stdout.strip():
         raise StateError("Git exclude path cannot be resolved")
     path = Path(result.stdout.strip())
     return path if path.is_absolute() else repository / path
 
 
-def append_local_ignore(repository: Path) -> None:
-    path = git_exclude_path(repository)
+def append_local_ignore(repository: Path, identity: StateIdentity | None = None) -> None:
+    path = git_exclude_path(repository, identity)
     flags = os.O_RDWR | os.O_CREAT
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -157,11 +174,15 @@ def append_local_ignore(repository: Path) -> None:
         os.close(descriptor)
 
 
-def ensure_ignored(repository: Path, relative: Path) -> None:
-    if ignored(repository, relative):
+def ensure_ignored(
+    repository: Path,
+    relative: Path,
+    identity: StateIdentity | None = None,
+) -> None:
+    if ignored(repository, relative, identity):
         return
-    append_local_ignore(repository)
-    if not ignored(repository, relative):
+    append_local_ignore(repository, identity)
+    if not ignored(repository, relative, identity):
         raise StateError("delivery state is not ignored")
 
 
@@ -185,6 +206,64 @@ def metadata_signature(metadata: os.stat_result) -> tuple[int, int, int, int]:
     return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink)
 
 
+def same_inode(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+class StateIdentity:
+    def __init__(
+        self,
+        repository: Path,
+        root_descriptor: int,
+        codex_descriptor: int,
+        state_descriptor: int,
+        filename: str,
+        file_metadata: os.stat_result | None,
+    ) -> None:
+        self.repository = repository
+        self.root_descriptor = root_descriptor
+        self.codex_descriptor = codex_descriptor
+        self.state_descriptor = state_descriptor
+        self.filename = filename
+        self.file_metadata = file_metadata
+
+    @staticmethod
+    def entry_metadata(parent: int, name: str) -> os.stat_result:
+        try:
+            return os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except OSError as error:
+            raise StateError("delivery state path changed during verification") from error
+
+    def assert_live(self) -> None:
+        try:
+            live_root = os.stat(self.repository, follow_symlinks=False)
+        except OSError as error:
+            raise StateError("repository path changed during verification") from error
+        if not same_inode(live_root, os.fstat(self.root_descriptor)):
+            raise StateError("repository path changed during verification")
+        if not same_inode(
+            self.entry_metadata(self.root_descriptor, ".codex"),
+            os.fstat(self.codex_descriptor),
+        ):
+            raise StateError("delivery-state parent changed during verification")
+        if not same_inode(
+            self.entry_metadata(self.codex_descriptor, "delivery-state"),
+            os.fstat(self.state_descriptor),
+        ):
+            raise StateError("delivery-state parent changed during verification")
+        if self.file_metadata is None:
+            return
+        current = state_metadata(self.state_descriptor, self.filename)
+        if current is None or metadata_signature(current) != metadata_signature(self.file_metadata):
+            raise StateError("delivery state changed during verification")
+        validate_state_metadata(current)
+
+    def set_file_metadata(self, metadata: os.stat_result) -> None:
+        validate_state_metadata(metadata)
+        self.file_metadata = metadata
+        self.assert_live()
+
+
 def verify_file(directory: int, filename: str) -> None:
     metadata = state_metadata(directory, filename)
     if metadata is None:
@@ -206,10 +285,14 @@ def verify_file(directory: int, filename: str) -> None:
         os.close(descriptor)
 
 
-def verify_git_state(repository: Path, relative: Path) -> None:
-    if tracked(repository, relative):
+def verify_git_state(
+    repository: Path,
+    relative: Path,
+    identity: StateIdentity | None = None,
+) -> None:
+    if tracked(repository, relative, identity):
         raise StateError("delivery state must remain untracked")
-    if not ignored(repository, relative):
+    if not ignored(repository, relative, identity):
         raise StateError("delivery state must be ignored")
     status = git(
         repository,
@@ -218,6 +301,7 @@ def verify_git_state(repository: Path, relative: Path) -> None:
         "--untracked-files=all",
         "--",
         relative.as_posix(),
+        identity=identity,
     )
     if status.returncode != 0 or status.stdout:
         raise StateError("delivery state is visible to Git status")
@@ -265,14 +349,32 @@ def execute(namespace: argparse.Namespace) -> int:
         metadata = state_metadata(state_fd, filename)
         if metadata is not None and not stat.S_ISREG(metadata.st_mode):
             raise StateError("delivery state target is symlinked or not regular")
-        if tracked(repository, relative):
+        identity = StateIdentity(
+            repository,
+            root_fd,
+            codex_fd,
+            state_fd,
+            filename,
+            metadata,
+        )
+        identity.assert_live()
+        if tracked(repository, relative, identity):
             raise StateError("delivery state must remain untracked")
         if namespace.command == "init":
-            ensure_ignored(repository, relative)
+            ensure_ignored(repository, relative, identity)
             if metadata is None:
                 create_file(state_fd, filename, template(task))
+                metadata = state_metadata(state_fd, filename)
+                if metadata is None:
+                    raise StateError("delivery state does not exist")
+                identity.set_file_metadata(metadata)
         verify_file(state_fd, filename)
-        verify_git_state(repository, relative)
+        metadata = state_metadata(state_fd, filename)
+        if metadata is None:
+            raise StateError("delivery state does not exist")
+        identity.set_file_metadata(metadata)
+        verify_git_state(repository, relative, identity)
+        identity.assert_live()
     finally:
         os.close(state_fd)
         os.close(codex_fd)

@@ -33,7 +33,7 @@ Before creating a branch or writing files:
 1. Fetch the relevant remotes.
 2. Perform repository-wide discovery of local and remote branches, worktrees, open PRs, the default branch, and working-tree changes.
 3. Reuse the canonical branch, worktree, and PR when one already exists for the task.
-4. Run `scripts/delivery-state.py init <task> --repository .`; do not hand-create or reimplement delivery state. The helper bounds the slug, contains the file under `.codex/delivery-state/`, rejects symlinked parents and targets plus hardlinked targets, enforces mode `0600`, installs a local ignore when needed, and verifies the file is actually ignored and untracked.
+4. Run `scripts/delivery-state.py init <task> --repository .`; do not hand-create or reimplement delivery state. The helper bounds the slug, contains the file under `.codex/delivery-state/`, rejects symlinked parents and targets plus hardlinked targets, enforces mode `0600`, revalidates live path identities around Git checks, installs a local ignore when needed, and verifies the file is actually ignored and untracked.
 
 Update delivery state after every phase, writer handoff, failure, pause, resumed run, or material remote change. Do not store credentials, private denylist terms, or sensitive logs. When a PR exists, mirror the non-sensitive state block into its body.
 
