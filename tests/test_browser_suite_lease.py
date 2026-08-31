@@ -159,6 +159,62 @@ class BrowserSuiteLeaseTests(unittest.TestCase):
             holder.stdin.flush()
             self.assertEqual(0, holder.wait(timeout=5))
 
+            released = run_lease(
+                "--lock-file",
+                str(lock),
+                "--",
+                sys.executable,
+                "-c",
+                "print('released')",
+            )
+
+            self.assertEqual(0, released.returncode, released.stderr)
+            self.assertEqual("released", released.stdout.strip())
+
+    def test_replacing_live_lock_parent_does_not_split_lease(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            parent = root / "coordination-parent"
+            parent.mkdir()
+            lock = parent / "browser.lock"
+            marker = root / "contender-started"
+            holder = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(LEASE),
+                    "--lock-file",
+                    str(lock),
+                    "--",
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(1)",
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.addCleanup(self._stop, holder)
+            assert holder.stderr and holder.stdin
+            self.assertIn("acquired", holder.stderr.readline().lower())
+            parent.rename(root / "replaced-parent")
+            parent.mkdir()
+
+            contender = run_lease(
+                "--lock-file",
+                str(lock),
+                "--",
+                sys.executable,
+                "-c",
+                f"from pathlib import Path; Path({str(marker)!r}).touch()",
+            )
+
+            self.assertEqual(4, contender.returncode)
+            self.assertFalse(marker.exists())
+            holder.stdin.write("x")
+            holder.stdin.flush()
+            self.assertEqual(0, holder.wait(timeout=5))
+
     def test_child_keeps_lease_when_wrapper_is_terminated(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock = Path(temporary) / "browser.lock"

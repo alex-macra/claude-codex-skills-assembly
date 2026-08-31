@@ -177,6 +177,55 @@ class DeliveryStateHelperTests(unittest.TestCase):
             self.assertEqual(2, result.returncode)
             self.assertEqual("tracked\n", state.read_text(encoding="utf-8"))
 
+    def test_init_rejects_existing_hardlinked_state_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            initialize_repository(repository)
+            state = repository / ".codex/delivery-state/hardlinked-task.md"
+            state.parent.mkdir(parents=True)
+            original = repository / "original.md"
+            original.write_text("private note\n", encoding="utf-8")
+            os.chmod(original, 0o600)
+            os.link(original, state)
+
+            result = run_helper(repository, "init", "hardlinked-task")
+
+            self.assertEqual(2, result.returncode)
+            self.assertEqual("private note\n", original.read_text(encoding="utf-8"))
+            self.assertEqual(2, state.stat().st_nlink)
+
+    def test_verify_rejects_hardlink_added_after_initialization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            initialize_repository(repository)
+            self.assertEqual(0, run_helper(repository, "init", "private-task").returncode)
+            state = repository / ".codex/delivery-state/private-task.md"
+            leak = repository / "tracked-leak.md"
+            os.link(state, leak)
+            subprocess.run(["git", "-C", str(repository), "add", "tracked-leak.md"], check=True)
+
+            result = run_helper(repository, "verify", "private-task")
+
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(2, state.stat().st_nlink)
+
+    def test_verify_rejects_state_replaced_with_hardlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            initialize_repository(repository)
+            self.assertEqual(0, run_helper(repository, "init", "replace-task").returncode)
+            state = repository / ".codex/delivery-state/replace-task.md"
+            replacement = repository / "replacement.md"
+            replacement.write_text("replacement\n", encoding="utf-8")
+            os.chmod(replacement, 0o600)
+            state.unlink()
+            os.link(replacement, state)
+
+            result = run_helper(repository, "verify", "replace-task")
+
+            self.assertEqual(2, result.returncode)
+            self.assertEqual(2, replacement.stat().st_nlink)
+
     def test_verify_rejects_unignored_or_nonprivate_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary) / "repository"

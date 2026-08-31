@@ -172,14 +172,24 @@ def state_metadata(directory: int, filename: str) -> os.stat_result | None:
         return None
 
 
-def verify_file(directory: int, filename: str) -> None:
-    metadata = state_metadata(directory, filename)
-    if metadata is None:
-        raise StateError("delivery state does not exist")
+def validate_state_metadata(metadata: os.stat_result) -> None:
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid():
         raise StateError("delivery state is symlinked or not an owned regular file")
     if stat.S_IMODE(metadata.st_mode) != 0o600:
         raise StateError("delivery state mode must be 0600")
+    if metadata.st_nlink != 1:
+        raise StateError("delivery state must not have hard links")
+
+
+def metadata_signature(metadata: os.stat_result) -> tuple[int, int, int, int]:
+    return (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_nlink)
+
+
+def verify_file(directory: int, filename: str) -> None:
+    metadata = state_metadata(directory, filename)
+    if metadata is None:
+        raise StateError("delivery state does not exist")
+    validate_state_metadata(metadata)
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -189,7 +199,8 @@ def verify_file(directory: int, filename: str) -> None:
         raise StateError("delivery state cannot be opened safely") from error
     try:
         opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino) != (metadata.st_dev, metadata.st_ino):
+        validate_state_metadata(opened)
+        if metadata_signature(opened) != metadata_signature(metadata):
             raise StateError("delivery state changed during verification")
     finally:
         os.close(descriptor)

@@ -9,7 +9,6 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
-import tempfile
 
 
 EXIT_INVALID = 2
@@ -17,6 +16,7 @@ EXIT_FORBIDDEN = 3
 EXIT_CONTENDED = 4
 LOCK_SIGNATURE = b"ai-skills-browser-suite\n"
 MAX_LOCK_BYTES = len(LOCK_SIGNATURE) + 32
+COORDINATION_ANCHOR = Path("/tmp")
 
 
 def positive_integer(value: str) -> int:
@@ -27,8 +27,7 @@ def positive_integer(value: str) -> int:
 
 
 def default_lock_file() -> Path:
-    root = Path(tempfile.gettempdir()).resolve(strict=True)
-    return root / f"ai-skills-browser-suite-{os.getuid()}.lock"
+    return COORDINATION_ANCHOR / f"ai-skills-browser-suite-{os.getuid()}.lock"
 
 
 def arguments(argv: list[str]) -> argparse.Namespace:
@@ -77,22 +76,22 @@ def open_lock(path: Path) -> int:
     return descriptor
 
 
-def open_coordination_directory(path: Path) -> tuple[Path, int]:
+def open_coordination_directory() -> int:
     try:
-        parent = path.parent.resolve(strict=True)
+        anchor = COORDINATION_ANCHOR.resolve(strict=True)
     except OSError as error:
-        raise OSError(errno.ENOENT, "lock parent does not exist") from error
+        raise OSError(errno.ENOENT, "coordination anchor does not exist") from error
     flags = os.O_RDONLY
     if hasattr(os, "O_DIRECTORY"):
         flags |= os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    descriptor = os.open(parent, flags)
+    descriptor = os.open(anchor, flags)
     metadata = os.fstat(descriptor)
     if not stat.S_ISDIR(metadata.st_mode):
         os.close(descriptor)
-        raise OSError(errno.ENOTDIR, "lock parent is not a directory")
-    return parent / path.name, descriptor
+        raise OSError(errno.ENOTDIR, "coordination anchor is not a directory")
+    return descriptor
 
 
 def acquire(descriptor: int) -> bool:
@@ -120,7 +119,7 @@ def run(namespace: argparse.Namespace) -> int:
         return EXIT_FORBIDDEN
 
     try:
-        lock_file, descriptor = open_coordination_directory(namespace.lock_file)
+        descriptor = open_coordination_directory()
     except OSError as error:
         print(f"browser lease refused: {error.strerror}", file=sys.stderr)
         return EXIT_INVALID
@@ -136,7 +135,7 @@ def run(namespace: argparse.Namespace) -> int:
             return EXIT_CONTENDED
 
         try:
-            metadata_descriptor = open_lock(lock_file)
+            metadata_descriptor = open_lock(namespace.lock_file)
             try:
                 write_metadata(metadata_descriptor)
             finally:
