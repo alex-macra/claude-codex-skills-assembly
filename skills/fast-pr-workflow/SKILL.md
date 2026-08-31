@@ -4,7 +4,7 @@ description: "Git and GitHub PR workflow: branch from the task, commit, and crea
 license: MIT
 metadata:
   display-name: "Fast PR Workflow"
-  version: "1.2"
+  version: "1.3"
   platforms: "claude-code codex"
   tags: "git github pr workflow"
 ---
@@ -25,11 +25,12 @@ Prepare a focused branch and pull request without disturbing unrelated work or c
 - Assume repo changes are intentional when they fit the current task. Do not over-audit every line.
 - Prefer one focused commit for the completed task unless the user asks for multiple commits.
 - Use existing PRs/branches when present; do not create duplicates.
+- In a delivery-loop run, the primary agent remains the sole writer and all collaborators must be idle before staging.
 
 ## Workflow
 
-1. `git status --short --branch`
-2. If on a protected/default branch or detached, create a branch from the task name before editing, committing, merging, rebasing, or pushing:
+1. Fetch remotes, then perform repository-wide discovery of branches, worktrees, open PRs, the default branch, and working-tree changes.
+2. Reuse the canonical task branch and PR. If on a protected/default branch or detached and none exists, create a branch from the task name before editing, committing, merging, rebasing, or pushing:
    - slug lowercase words with hyphens
    - follow the repository's branch convention; otherwise use `work/<slug>`
    - example: `work/add-export`
@@ -47,6 +48,8 @@ Prepare a focused branch and pull request without disturbing unrelated work or c
    - if an open PR exists for the branch, update it
    - otherwise create a PR with a concise summary and validation
    - do not merge it
+7. Fetch the pushed branch and compare the full local `HEAD`, remote branch head, and PR head commit IDs. A missing or mismatched head is a failed shipping step.
+8. When delivery state exists, mirror its non-sensitive checks, blockers, browser policy, head, tree, and next gate into the PR body.
 
 ## PR Body
 

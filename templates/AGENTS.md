@@ -7,6 +7,7 @@ This is an optional starting point. Keep repository-specific conventions in the 
 - Check the installed skill list before inventing a workflow.
 - Load a matching skill when the request names it or clearly falls within its description.
 - Follow repository-local instructions when they are more specific than generic guidance.
+- Claude Code can preload skills declared by an agent definition. Codex dispatch must explicitly tell each subagent which `SKILL.md` files to read completely before acting.
 
 ## Preserve repository state
 

@@ -2,6 +2,19 @@
   "version": "1.0",
   "description": "Offline routing fixtures for the public activation registry.",
   "positive": {
+    "pause ongoing work and save the task state": [
+      "delivery-loop"
+    ],
+    "resume this task on the same PR": [
+      "delivery-loop"
+    ],
+    "continue the same pull request": [
+      "delivery-loop",
+      "fast-pr-workflow"
+    ],
+    "work on these tasks with multiple agents in parallel": [
+      "delivery-loop"
+    ],
     "run the delivery loop on this task": [
       "delivery-loop"
     ],
@@ -149,6 +162,7 @@
     ]
   },
   "negative": [
+    "continue solving the same problem",
     "translate this paragraph to German",
     "what time is it in Tokyo",
     "sort this list alphabetically",

@@ -49,6 +49,12 @@ Selected profiles are the complete desired set on selected surfaces. Pass every 
 
 The activation hook emits matching skill names from `routing/skill-rules.json`, fails open on malformed input, and never injects skill bodies.
 
+## Agent portability
+
+Claude Code can preload the skills declared in an agent definition. Codex dispatchers must explicitly instruct each subagent to read the required `SKILL.md` files completely before acting. The agent definitions state both behaviors instead of assuming one host's preload model applies to another.
+
+The delivery-loop skill keeps resumable local state under `.codex/delivery-state/` and includes a nonblocking host-wide browser-suite lease. Browser execution defaults to one suite and one worker; repository profiles may forbid it entirely.
+
 ## Output styles
 
 The `default` profile installs the `Terse` output style file to the Claude surface's `output-styles/` directory. Installing it does not turn it on - a style only changes Claude Code's behavior once selected with `/config` (Output style) or by setting `"outputStyle": "Terse"` in a Claude Code settings file. A style change takes effect after `/clear` or a new session.

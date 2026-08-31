@@ -232,7 +232,7 @@
     "delivery-loop": {
       "type": "process",
       "priority": "high",
-      "description": "Bounded delivery conductor from research and planning through implementation, quality loops, live verification, review, PR readiness, smoke testing, and merge handoff.",
+      "description": "Bounded delivery conductor with one writer, durable pause and resume state, focused verification, ordered reviews, PR shipping, and remote-head verification.",
       "promptTriggers": {
         "keywords": [
           "delivery loop",
@@ -251,7 +251,11 @@
           "before pr",
           "from planning to implementation",
           "work this in a loop",
-          "run the orchestrator"
+          "run the orchestrator",
+          "pause ongoing work",
+          "resume this task",
+          "multiple agents in parallel",
+          "multi-agent"
         ],
         "intentPatterns": [
           "(run|take|move).*?(through|from).*?(delivery|quality|review).*?(loop|gate|workflow)",
@@ -263,7 +267,10 @@
           "(verify|test|check).*?(fix|repair).*?(rerun|re-run|again)",
           "(review|adversarial review).*?(then|and).*?(smoke|smoke test)",
           "(quality|review|smoke|security|a11y|accessibility).*?(before|for).*?(PR|pr|pull request)",
-          "(prepare|make|get).*?(ready).*?(PR|pr|pull request)"
+          "(prepare|make|get).*?(ready).*?(PR|pr|pull request)",
+          "(pause|stop).*?(ongoing|current|this).*?(work|task|loop)",
+          "(resume|continue).*?(this|current|same).*?(task|work|loop|pull request|branch|\\b(PR|pr)\\b)",
+          "(use|run|work).*?(multiple|parallel|multi.?agent).*?(agents|tasks|work|delivery)"
         ]
       },
       "fileTriggers": {
