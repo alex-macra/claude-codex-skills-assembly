@@ -1,0 +1,29 @@
+# Delivery state
+
+- Task:
+- Phase:
+- Goal:
+- Accepted plan:
+- Repository:
+- Base:
+- Base ref:
+- Head ref:
+- Branch:
+- Local head:
+- Remote head:
+- PR head:
+- Tree:
+- Canonical PR:
+- PR state:
+- Writer:
+- Ownership epoch:
+- Agents:
+- Processes:
+- Browser policy:
+- Browser lease:
+- Checks:
+- Failures and fixes:
+- Review findings:
+- Blockers:
+- Next gate:
+- Updated at:

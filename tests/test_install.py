@@ -101,6 +101,13 @@ class InstallerTests(unittest.TestCase):
         for surface in (".claude", ".codex", ".agents"):
             links = list((project / surface / "skills").glob("*/SKILL.md"))
             self.assertEqual(len(links), 15, surface)
+            self.assertTrue(
+                (
+                    project
+                    / surface
+                    / "skills/delivery-loop/scripts/browser-suite-lease.py"
+                ).is_file()
+            )
         rules = json.loads((project / ".claude" / "skills" / "skill-rules.json").read_text())
         self.assertEqual(rules["_managedBy"], "ai-skills")
         self.assertEqual(set(rules["skills"]), set(installer.CatalogSet([ROOT / "catalog.json"]).skills))
