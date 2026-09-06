@@ -54,6 +54,12 @@
     "see-it-live": {
       "path": "skills/see-it-live"
     },
+    "spark-task-planning": {
+      "path": "skills/spark-task-planning"
+    },
+    "spark-task-research": {
+      "path": "skills/spark-task-research"
+    },
     "task-research": {
       "path": "skills/task-research"
     },
@@ -96,6 +102,8 @@
         "qa-automation",
         "security-review",
         "see-it-live",
+        "spark-task-planning",
+        "spark-task-research",
         "task-research",
         "web-dev-backend",
         "web-dev-frontend"

@@ -65,7 +65,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(second[0], 0, second)
         for home in self.user_env.values():
             skills = Path(home) / "skills"
-            self.assertEqual(len(list(skills.iterdir())), 15)
+            self.assertEqual(len(list(skills.iterdir())), 17)
         self.assertEqual(len(list((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents").iterdir())), 3)
         self.assertEqual(len(list((Path(self.user_env["CODEX_HOME"]) / "agents").iterdir())), 3)
 
@@ -100,7 +100,7 @@ class InstallerTests(unittest.TestCase):
 
         for surface in (".claude", ".codex", ".agents"):
             links = list((project / surface / "skills").glob("*/SKILL.md"))
-            self.assertEqual(len(links), 15, surface)
+            self.assertEqual(len(links), 17, surface)
             self.assertTrue(
                 (
                     project
@@ -719,7 +719,7 @@ class InstallerTests(unittest.TestCase):
         rules = json.loads(
             (project / ".claude" / "skills" / "skill-rules.json").read_text()
         )["skills"]
-        self.assertEqual(len(rules), 16)
+        self.assertEqual(len(rules), 18)
         self.assertIn("a11y-audit", rules)
         self.assertIn("sample-overlay", rules)
 

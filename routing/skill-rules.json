@@ -232,42 +232,26 @@
     "delivery-loop": {
       "type": "process",
       "priority": "high",
-      "description": "Bounded delivery conductor with one writer, durable pause and resume state, focused verification, ordered reviews, PR shipping, and remote-head verification.",
+      "description": "Execute approved task Markdown through repository validation, implementation, test/build, and bounded fix/retest before an optional PR handoff.",
       "promptTriggers": {
         "keywords": [
           "delivery loop",
           "quality loop",
-          "review loop",
-          "plan to implementation",
-          "plan-to-implementation",
+          "execute task markdown",
+          "validate task markdown",
+          "implement task packet",
+          "test build fix retest",
+          "test-build-fix-retest",
+          "fix and retest",
           "verify fix rerun",
           "verify/fix/rerun",
-          "PR readiness",
-          "pr readiness",
-          "ready for PR",
-          "ready for pr",
-          "run this through quality",
-          "before PR",
-          "before pr",
-          "from planning to implementation",
-          "work this in a loop",
-          "run the orchestrator"
+          "run this through quality"
         ],
         "intentPatterns": [
-          "(run|take|move).*?(through|from).*?(delivery|quality|review).*?(loop|gate|workflow)",
-          "(work|run|take).*?(this|task|change|work).*?(in|through).*?(a )?loop",
-          "(run|use|start).*?(orchestrator|conductor).*?(task|change|work|workflow)",
-          "(plan|planning).*?(to|through).*?(implementation|implement)",
-          "(plan|planning).*?(then|and).*?(implementation|implement|build)",
-          "(plan|planning).*?(then|and|do).*?(quality|review|smoke)",
-          "(verify|test|check).*?(fix|repair).*?(rerun|re-run|again)",
-          "(review|adversarial review).*?(then|and).*?(smoke|smoke test)",
-          "(quality|review|smoke|security|a11y|accessibility).*?(before|for).*?(PR|pr|pull request)",
-          "(prepare|make|get).*?(ready).*?(PR|pr|pull request)",
-          "^(please |let.?s )?(pause|stop).*?\\b(ongoing|current|this)\\b.*?\\b(work|task|loop)\\b",
-          "^(please |let.?s )?(resume|continue).*?(\\b(task|work|loop)\\b|pull request|\\b(PR|pr)\\b)",
-          "^(please |let.?s )?(use|run) (multiple|parallel) agents( in parallel)?",
-          "^(please |let.?s )?work.*?(task|tasks|work|change|changes).*?with (multiple|parallel) agents"
+          "(run|take|work).*?(through|in).*?(delivery|quality).*?loop",
+          "(validate|check).*?(task|ticket).*?(markdown|[.]md).*?(implement|execute|deliver)",
+          "(implement|execute|deliver|run).*?(task|ticket).*?(markdown|[.]md|packet)",
+          "(test|build|verify|check).*?(fix|repair).*?(retest|rerun|re-run|again)"
         ]
       },
       "fileTriggers": {
@@ -323,10 +307,6 @@
       "description": "Fast branch, commit, push, and PR create/update workflow for clean task work.",
       "promptTriggers": {
         "keywords": [
-          "create PR",
-          "update PR",
-          "open PR",
-          "prepare PR",
           "PR body",
           "pull request",
           "commit this",
@@ -339,22 +319,19 @@
           "make a branch",
           "gh pr create",
           "gh pr edit",
-          "merge PR",
           "merge pull request",
           "merge to main",
           "merge into main",
           "main branch",
-          "squash PR",
           "squash merge",
-          "land PR",
           "promote dev"
         ],
         "intentPatterns": [
-          "(create|open|prepare|update).*?(PR|pull request)",
+          "(create|open|prepare|update).*?(\\bPR\\b|pull request)",
           "(commit|stage|push).*?(change|changes|work|this|branch)",
           "(make|create|checkout).*?(branch).*?(task|ticket|name)",
-          "(ship|wrap up|finish).*?(task|work|PR|branch)",
-          "(merge|squash|land|promote).*?(#\\d+|PR|pull request|it|this|main|master|branch)"
+          "(ship|wrap up|finish).*?(task|work|\\bPR\\b|branch)",
+          "(merge|squash|land|promote).*?(#\\d+|\\bPR\\b|pull request|it|this|main|master|branch)"
         ]
       },
       "fileTriggers": {
@@ -515,6 +492,56 @@
           "(run|do|add).*?(smoke|sanity).*?(test|check)",
           "(quick|fast).*?(sanity|check).*?(work|boot|render|up)",
           "(after (deploy|merge|integrate)).*?(check|verify|smoke)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": []
+      }
+    },
+    "spark-task-planning": {
+      "type": "process",
+      "priority": "high",
+      "description": "Turn approved architecture and repository evidence into dependency-ordered, Qwen-ready DGX Spark task packets with no unresolved design choices.",
+      "promptTriggers": {
+        "keywords": [
+          "DGX Spark task planning",
+          "Qwen task planning",
+          "Qwen-ready tasks",
+          "Qwen ready tasks",
+          "Qwen task packet",
+          "decompose for Qwen",
+          "plan for DGX Spark"
+        ],
+        "intentPatterns": [
+          "(plan|decompose|break down|write|create|prepare|shape|improve).*?(DGX Spark|Qwen3.?Coder|Qwen).*?(task|packet|plan|epic|feature|work)",
+          "(plan|decompose|break down|write|create|prepare|shape|improve).*?(task|packet|plan|epic|feature|work).*?(DGX Spark|Qwen3.?Coder|Qwen)",
+          "(turn|convert).*?(research|plan|epic|architecture).*?(DGX Spark|Qwen3.?Coder|Qwen)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": []
+      }
+    },
+    "spark-task-research": {
+      "type": "process",
+      "priority": "high",
+      "description": "Gather repository-grounded evidence for DGX Spark and Qwen planning by verifying files, symbols, versions, dependencies, commands, and risks.",
+      "promptTriggers": {
+        "keywords": [
+          "DGX Spark task research",
+          "Qwen task research",
+          "research for DGX Spark",
+          "research for Qwen",
+          "repository evidence for DGX Spark",
+          "repository evidence for Qwen",
+          "ground this DGX Spark task",
+          "ground this Qwen task"
+        ],
+        "intentPatterns": [
+          "(research|investigate).*?(DGX Spark|Qwen3.?Coder|Qwen).*?(task|implementation|work|plan)",
+          "(research|investigate).*?(task|implementation|work|plan).*?(DGX Spark|Qwen3.?Coder|Qwen)",
+          "(ground|verify|audit).*?(DGX Spark|Qwen).*?(task|plan|packet).*?(repository|repo|codebase)",
+          "(prepare|gather).*?(repository|repo|codebase).*?evidence.*?(DGX Spark|Qwen)"
         ]
       },
       "fileTriggers": {

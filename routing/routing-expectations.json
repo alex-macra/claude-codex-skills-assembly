@@ -2,41 +2,39 @@
   "version": "1.0",
   "description": "Offline routing fixtures for the public activation registry.",
   "positive": {
-    "pause ongoing work and save the task state": [
+    "execute this task markdown through the delivery loop": [
       "delivery-loop"
     ],
-    "resume this task on the same PR": [
-      "delivery-loop"
+    "validate TASK-123.md, implement it, run tests and build, fix failures, then retest": [
+      "delivery-loop",
+      "qa-automation"
     ],
-    "continue the same pull request": [
+    "run the delivery loop on TASK-123.md then open a PR": [
       "delivery-loop",
       "fast-pr-workflow"
     ],
-    "work on these tasks with multiple agents in parallel": [
-      "delivery-loop"
+    "ground this DGX Spark task in repository evidence": [
+      "spark-task-research"
     ],
-    "run the delivery loop on this task": [
-      "delivery-loop"
+    "research for Qwen before preparing implementation work": [
+      "spark-task-research",
+      "task-research"
     ],
-    "work this in a loop and get it ready": [
-      "delivery-loop"
+    "turn the approved epic into Qwen-ready tasks": [
+      "spark-task-planning"
     ],
-    "plan then implement this": [
-      "delivery-loop"
+    "create task packets and an execution DAG for DGX Spark": [
+      "spark-task-planning"
     ],
-    "quality loop this before PR": [
-      "delivery-loop"
+    "shape these tasks for Qwen": [
+      "spark-task-planning"
     ],
-    "plan then do quality review smoke": [
-      "delivery-loop"
+    "research this task for Qwen": [
+      "spark-task-research",
+      "task-research"
     ],
-    "run the orchestrator for this AI Skills Assembly task": [
-      "delivery-loop"
-    ],
-    "review/adversarial review then smoke test": [
-      "delivery-loop",
-      "adversarial-review",
-      "see-it-live"
+    "create PR for this change": [
+      "fast-pr-workflow"
     ],
     "merge this PR into main": [
       "fast-pr-workflow"
@@ -171,6 +169,18 @@
     "what time is it in Tokyo",
     "sort this list alphabetically",
     "write a haiku about autumn",
-    "summarize the meeting notes"
+    "summarize the meeting notes",
+    "summarize this Markdown task without implementing it",
+    "plan a weekend trip",
+    "optimize this Apache Spark data-processing job",
+    "create task packets for this Apache Spark migration",
+    "write task packets for the Apache Spark job",
+    "map an execution DAG for Apache Spark stages",
+    "create task packets for this project",
+    "plan this work as a task packet",
+    "turn this epic into an implementation packet",
+    "create a profile for Qwen",
+    "update the profile settings",
+    "create task packets for our sprint"
   ]
 }

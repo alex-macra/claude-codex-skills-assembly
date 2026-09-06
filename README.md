@@ -53,7 +53,9 @@ The activation hook emits matching skill names from `routing/skill-rules.json`, 
 
 Claude Code can preload the skills declared in an agent definition. Codex dispatchers must explicitly instruct each subagent to read the required `SKILL.md` files completely before acting. The agent definitions state both behaviors instead of assuming one host's preload model applies to another.
 
-The delivery-loop skill keeps resumable local state under `.codex/delivery-state/`. Its executable `scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks or accepting hard links. The nonblocking browser helper coordinates through a stable system directory lease even if its metadata file or parent is replaced. Browser policy is `allowed` or `forbidden`; lease status is tracked separately, and execution defaults to one suite and one worker.
+The DGX Spark task pipeline separates repository research, task planning, implementation, and PR mechanics. `spark-task-research` produces verified repository evidence. `spark-task-planning` turns approved architecture and that evidence into dependency-ordered, Qwen-ready Markdown packets. `delivery-loop` validates and executes one packet through implementation, test/build, and fix/retest. `fast-pr-workflow` handles an optional authorized PR handoff after validation is green.
+
+Delivery runs can keep optional resumable state under `.codex/delivery-state/`. The executable `scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks or accepting hard links. The state records the four delivery phases but does not add phases or grant authority. The nonblocking browser helper coordinates test execution through a stable system directory lease, with one suite and one worker by default.
 
 ## Output styles
 

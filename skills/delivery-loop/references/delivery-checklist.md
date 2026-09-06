@@ -1,124 +1,73 @@
 # Delivery checklist
 
-Use this checklist as the execution record. Run `scripts/delivery-state.py init <task> --repository .` to create `.codex/delivery-state/<task>.md`; do not hand-create or reimplement it. Use `verify` before resume, pause, and shipping. Mirror its non-sensitive contents into the canonical PR body when a PR is available.
+Use this checklist to execute one approved Markdown task packet. The four rows below are the complete delivery phase sequence.
 
-## User-facing status block
+## Evidence block
 
 ```markdown
 **Delivery Status**
+- Task file:
 - Phase:
-- Goal:
-- Current evidence:
-- Checks run:
-- Failures and fixes:
-- Review findings:
-- PR:
+- Readiness outcome:
+- Changed files:
+- Commands and results:
+- Failures:
+- Fixes:
+- Reruns:
+- Discrepancies:
 - Blockers:
 - Next gate:
 ```
 
-## Phase checklist
+## Phase contract
 
 | Phase | Required input | Exit evidence | Stop condition | Next gate |
 | --- | --- | --- | --- | --- |
-| Intake | Goal, repository, constraints, accepted-plan state, browser policy. | Durable state names the repository, base, writer, policy, and goal. | Goal, repository, or authority is ambiguous. | Research or plan gate. |
-| Research | Intake plus the uncertain question. | Local sources and prior art checked; facts and assumptions separated. | A material choice still needs the user. | Plan gate. |
-| Plan gate | Goal and decision-complete evidence. | Approved plan recorded. | Current conversation contains no approval. | Implementation. |
-| Implementation | Approved plan, sole writer, cleanly bounded files. | Scoped diff and affected checks recorded. | Work needs new scope, a dependency, credentials, or destructive action. | Focused verification. |
-| Focused verification | Current diff and cheapest relevant checks. | Changed path proven, broader relevant suite green, failures classified. | Retry limit reached or required environment unavailable. | Architecture and security review. |
-| Architecture and security review | Current diff and verification evidence. | Boundary, dependency, failure, and trust-surface findings recorded and fixed or dispositioned. | Finding requires scope or user decision. | Adversarial review. |
-| Adversarial review | Reviewed diff without first-review framing. | Concrete falsification attempts and verdict recorded. | Real defect needs broader redesign or authority. | Final smoke. |
-| Final smoke | Final reviewed tree and critical path. | Fast critical path passes without tracked changes. | Smoke fails or mutates tracked state. | PR shipping. |
-| PR shipping | Authorization, green tree, idle collaborators, canonical branch and PR. | Commit pushed and one PR created or updated. | Authorization missing or repository-wide discovery is stale. | Remote-head verification. |
-| Remote-head verification | Local commit, fetched remote, canonical PR. | Exact repository, refs, open PR identity, and all three commit IDs match. | Any identity, state, count, or head differs. | Await merge. |
-| Await merge | Verified PR and handoff evidence. | PR remains open with next human gate stated. | Merge or release lacks current explicit authority. | User decision. |
+| Validate task Markdown | One approved task file and the target checkout. | Repository facts verified and one outcome recorded: `READY`, `BLOCKED_BY_SPEC`, or `NO_CHANGE_NEEDED`. | `BLOCKED_BY_SPEC`, ambiguous authority, or missing prerequisite. | Implement when `READY`; verify without edits when `NO_CHANGE_NEEDED`. |
+| Implement | A validated packet with no unresolved design choice. | Scoped diff satisfies the required change while preserving invariants and non-goals. | New scope, dependency, schema work, credentials, or unsettled decision is required. | Test and build. |
+| Test and build | Current diff and the packet's verification contract. | Exact focused and broader commands run; actual results and failure classes recorded. | Required environment or access is unavailable. | Fix and retest, or handoff when green. |
+| Fix and retest | An in-scope product or test failure with a reproducer. | Fix recorded; focused proof and affected broader checks rerun. | Two similar repairs fail, three cycles do not converge, or the fix leaves packet scope. | Test and build until green, then handoff. |
 
-## 1. Intake
+## 1. Validate task Markdown
 
-- Confirm the current repository, default branch, worktree, user goal, constraints, and accepted plan.
-- Name the sole writer and ownership epoch. A handoff increments the epoch and makes the prior writer read-only.
-- Set browser policy to `allowed` or `forbidden`. Separately set lease status to `not-needed`, `pending`, `held`, or `contended`; default local capacity is one suite and one worker.
-- Fetch remotes and perform repository-wide discovery of branches, worktrees, open PRs, tracked changes, and running task processes before creating a branch.
-- Reuse the canonical branch and PR. Stop on ambiguous or overlapping work.
+- Read repository instructions and the entire task file.
+- Resolve the repository, branch, base commit or ref, prerequisite task outputs, and allowed scope.
+- Verify every referenced existing file, symbol, behavior, dependency, pattern, and command.
+- Confirm proposed files and symbols are labeled as proposed.
+- Require every top-level packet section as mandatory: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, and Handoff. A section that truly does not apply remains present and says `Not applicable - <reason>`.
+- Record `READY` when the task is decision-complete, `BLOCKED_BY_SPEC` for material conflicts or missing decisions, or `NO_CHANGE_NEEDED` when acceptance is already satisfied.
+- Stop before editing on `BLOCKED_BY_SPEC`. Do not silently replan the task.
+- On `NO_CHANGE_NEEDED`, skip code edits, run the specified verification, and retain the proof in the handoff.
 
-## 2. Research
+## 2. Implement
 
-- Search local code and project instructions first.
-- Read every selected skill completely, including required references.
-- Use external sources only when local evidence cannot answer the question.
-- Record verified facts separately from assumptions.
+- Follow the validated contract and existing repository patterns.
+- Preserve unrelated changes and declared invariants, interfaces, errors, compatibility, security, and concurrency behavior.
+- Do not weaken acceptance criteria or tests to get green.
+- Return to validation if the starting evidence changes materially.
 
-## 3. Plan gate
+## 3. Test and build
 
-- Produce one decision-complete `<proposed_plan>` when approval is absent.
-- Record approval from the current conversation before implementation.
-
-## 4. Implementation
-
-- Keep the primary agent as sole writer in the initial ownership epoch.
-- Give parallel agents bounded read-only tasks and allowed paths.
-- QA or shipper may write only in a new ownership epoch that names them; the previous writer, including the primary agent, must stop first.
-- Preserve unrelated files and update durable state after material changes.
-
-## 5. Focused verification
-
-- Run the cheapest focused check first and reproduce a defect before fixing it.
+- Run the cheapest focused command first.
+- Run broader tests, type checks, linters, and builds named by the packet when relevant.
+- Capture commands and actual output, including pass counts, failures, timings, and skipped checks when available.
 - Classify each failure as product, test, environment, or preexisting.
-- Rerun the focused check after a fix, then the broader relevant suite once.
-- Set lease status to `pending`, run executable `scripts/browser-suite-lease.py` for allowed browser work, then record `held` or `contended`. Pass its worker count to the runner. Respect `forbidden` with `not-needed` and no fallback.
-- Capture actual pass counts, failures, timings, and skipped checks.
+- For browser work, obey repository browser policy and use `scripts/browser-suite-lease.py` when the shared local lease is required.
 
-## 6. Architecture and security review
+## 4. Fix and retest
 
-- Read the complete diff against the intended base.
-- Review module boundaries, dependency direction, cohesion, failure paths, and testability.
-- Review security for automation, filesystem, command, credential, dependency, publication, or untrusted-input surfaces.
-- Apply only real scoped fixes, then return to focused verification.
+- Fix only in-scope product and test defects.
+- Rerun the smallest proof after each fix.
+- Rerun affected broader commands after focused checks pass.
+- Stop after two materially similar failed repairs or three repair cycles without convergence.
+- On stop, record the reproducer, observed failure, attempted fixes, and unresolved question.
 
-## 7. Adversarial review
+## Optional state
 
-- Start from the required invariants, not the first review's conclusions.
-- Attack malformed inputs, errors, ordering, concurrency, trust boundaries, and resource limits.
-- Record a concrete failing scenario for every defect or name the attacks that did not break the claim.
-- After any fix, repeat focused verification, architecture and security review, then adversarial review.
+For work that will cross sessions, use `scripts/delivery-state.py init <task> --repository .` and update the generated record after phases and material failures. Run `verify` before resuming. Do not hand-create or reimplement the state file. Optional state records the four-phase evidence; it does not add a workflow phase or grant authority.
 
-## 8. Final smoke
+## Optional PR handoff
 
-- Confirm all collaborators are idle and mutating processes are stopped.
-- Run the fastest critical-path proof on the final reviewed tree.
-- If the smoke mutates tracked state or fails, return to implementation.
-
-## 9. PR shipping
-
-- Refresh repository-wide branches, worktrees, PRs, writer, agents, processes, and diff.
-- Stage only reviewed task files; keep delivery state ignored.
-- Commit and push only with existing authorization and the current ownership epoch.
-- Create or update one canonical PR and mirror the non-sensitive state block into its body.
-- Enter the shipping freeze before pushing. Do not merge.
-
-## 10. Remote-head verification
-
-- Fetch the pushed branch without rebasing.
-- Query the exact repository and require the recorded exact base ref, exact head ref, canonical PR number or URL, and `OPEN` state.
-- Require exactly one canonical PR for that repository, base, and head.
-- Resolve full commit IDs for local `HEAD`, the remote branch, and the PR head, and require all three to match.
-- A stale, duplicated, closed, redirected, incomplete, or local-only result fails this phase.
-- Update durable state and the PR body with the verified head and tree.
-- Keep the shipping freeze. A tracked-file fix starts a new ownership epoch at implementation and repeats all later phases.
-
-## 11. Await merge
-
-- Report branch, commit, tree, PR URL, validation, review verdicts, browser policy, remaining risks, and next gate.
-- Leave protected branches unmerged unless the current request explicitly names the target and requests the merge.
-
-## Pause and resume
-
-- On pause, update durable state with agents, processes, browser policy, lease status, checks, failures, blockers, and next gate. Run the state helper's `verify` command, then stop or identify every live process.
-- On resume, run the state helper's `verify` command, read durable state, fetch remotes, repeat repository-wide discovery, and compare repository, base ref, head ref, local, remote, canonical PR, worktrees, and tracked changes before writing.
-- If drift is safe, record how it was reconciled. If ownership or scope is ambiguous, stop for direction.
-
-## Retry limits
-
-- Stop after two failed fixes for the same focused defect.
-- Stop after three full quality cycles without convergence.
-- Stop before new dependencies, credentials, destructive operations, external mutations, or expanded scope without authority.
+- PR work starts only after the four-phase loop is green.
+- Invoke `fast-pr-workflow` only when the current request authorizes the relevant Git or pull-request actions.
+- Without that authorization, report a PR-ready local handoff and stop.
