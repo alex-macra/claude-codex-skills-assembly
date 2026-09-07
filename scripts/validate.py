@@ -36,6 +36,9 @@ ALLOWED_FRONTMATTER = {
     "allowed-tools",
 }
 EXCLUDED_PARTS = {
+    ".agents",
+    ".claude",
+    ".codex",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
@@ -147,8 +150,14 @@ def repo_entries(root: Path) -> list[Path]:
     excluded = EXCLUDED_PARTS if tracked is not None else {".git"}
     for current, directories, files in os.walk(root, followlinks=False):
         current_path = Path(current)
-        directories[:] = sorted(name for name in directories if name not in excluded)
+        directories[:] = sorted(
+            name
+            for name in directories
+            if name not in excluded and not name.startswith(".gitignore.bak")
+        )
         for name in directories + sorted(files):
+            if name.startswith(".gitignore.bak"):
+                continue
             path = current_path / name
             if any(part in excluded for part in path.relative_to(root).parts):
                 continue
@@ -688,25 +697,39 @@ def validate_routing(
             findings.append(finding("routing", registry_path.relative_to(root), f"skill {name} has invalid priority"))
         prompt = config.get("promptTriggers", {})
         files = config.get("fileTriggers", {})
-        if not isinstance(prompt, dict) or not string_list(prompt.get("keywords", [])) or not string_list(
-            prompt.get("intentPatterns", [])
+        if (
+            not isinstance(prompt, dict)
+            or not string_list(prompt.get("keywords", []))
+            or not string_list(prompt.get("intentPatterns", []))
+            or not string_list(prompt.get("excludePatterns", []))
         ):
             findings.append(finding("routing", registry_path.relative_to(root), f"skill {name} has invalid prompt triggers"))
         else:
-            for pattern in prompt.get("intentPatterns", []):
-                try:
-                    re.compile(pattern, re.IGNORECASE)
-                except re.error as exc:
-                    findings.append(finding("routing", registry_path.relative_to(root), f"skill {name} has invalid intent regex: {exc}"))
-                    continue
-                if callable(regex_safety) and not regex_safety(pattern):
-                    findings.append(
-                        finding(
-                            "routing",
-                            registry_path.relative_to(root),
-                            f"skill {name} has unsafe intent regex",
+            pattern_groups = (
+                ("intent", prompt.get("intentPatterns", [])),
+                ("exclusion", prompt.get("excludePatterns", [])),
+            )
+            for pattern_kind, patterns in pattern_groups:
+                for pattern in patterns:
+                    try:
+                        re.compile(pattern, re.IGNORECASE)
+                    except re.error as exc:
+                        findings.append(
+                            finding(
+                                "routing",
+                                registry_path.relative_to(root),
+                                f"skill {name} has invalid {pattern_kind} regex: {exc}",
+                            )
                         )
-                    )
+                        continue
+                    if callable(regex_safety) and not regex_safety(pattern):
+                        findings.append(
+                            finding(
+                                "routing",
+                                registry_path.relative_to(root),
+                                f"skill {name} has unsafe {pattern_kind} regex",
+                            )
+                        )
         if not isinstance(files, dict) or not string_list(files.get("pathPatterns", [])) or not string_list(
             files.get("pathExclusions", [])
         ):

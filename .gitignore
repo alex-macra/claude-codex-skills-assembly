@@ -7,3 +7,12 @@ __pycache__/
 .venv/
 venv/
 .codex/delivery-state/
+
+# ai-skills generated state
+.agents
+.claude
+.codex
+AGENTS.md
+CLAUDE.md
+.gitignore.bak*
+# /ai-skills generated state

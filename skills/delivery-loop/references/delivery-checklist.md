@@ -32,12 +32,18 @@ Use this checklist to execute one approved Markdown task packet. The four rows b
 
 - Read repository instructions and the entire task file.
 - Resolve the repository, branch, base commit or ref, prerequisite task outputs, and allowed scope.
+- Record full commit IDs, upstream refs, worktree overlap, and which evidence is committed versus local or ignored.
+- Inspect immutable evidence by object ID. Assert mutable refs resolve to their expected full commits before using them, and never substitute checkout `HEAD` for the packet base.
 - Verify every referenced existing file, symbol, behavior, dependency, pattern, and command.
+- Verify one writable repository and delivery history, exact read and write sets, predecessor artifact identities, and a collision-safe retry or recovery path.
+- Classify each command as current-state or post-change proof; run safe preflight and record its expected and actual result.
+- Bind tools, locks, CI-job setup, and any credential to explicit provenance and minimum scope. Reject unprovenanced ambient installs and implicit cross-job state.
 - Confirm proposed files and symbols are labeled as proposed.
-- Require every top-level packet section as mandatory: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, and Handoff. A section that truly does not apply remains present and says `Not applicable - <reason>`.
-- Record `READY` when the task is decision-complete, `BLOCKED_BY_SPEC` for material conflicts or missing decisions, or `NO_CHANGE_NEEDED` when acceptance is already satisfied.
+- Require every mandatory top-level section or equivalent embedded-ledger field: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, and Handoff. A field that truly does not apply remains present and says `Not applicable - <reason>`.
+- Treat canonical tracker status as informational. Only the packet's fixed readiness outcome controls delivery.
+- Record `READY` when the task is decision-complete and has a clean or isolated execution state, `BLOCKED_BY_SPEC` for material conflicts or missing decisions, or `NO_CHANGE_NEEDED` when acceptance is already satisfied from a pinned clean or isolated state.
 - Stop before editing on `BLOCKED_BY_SPEC`. Do not silently replan the task.
-- On `NO_CHANGE_NEEDED`, skip code edits, run the specified verification, and retain the proof in the handoff.
+- On `NO_CHANGE_NEEDED`, skip code edits and prove every acceptance case. Internal-only proof is insufficient when acceptance requires another repository, runtime, browser, artifact, or served response.
 
 ## 2. Implement
 

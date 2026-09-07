@@ -841,12 +841,12 @@ def hook_entry(catalogs: CatalogSet, spec: HookSpec) -> dict:
     catalog_value = os.pathsep.join(str(path) for path in catalogs.paths)
     interpreter = shlex.quote(str(PYTHON))
     if spec.key == "mergeGuard":
-        command = f"{interpreter} {shlex.quote(str(source))}"
+        command = f"{interpreter} -I {shlex.quote(str(source))}"
     else:
         command = (
             f"test -f {shlex.quote(str(source))} && "
             f"env AI_SKILLS_CATALOGS={shlex.quote(catalog_value)} "
-            f"{interpreter} {shlex.quote(str(source))} || true"
+            f"{interpreter} -I {shlex.quote(str(source))} || true"
         )
     return {
         "matcher": spec.matcher,
@@ -894,7 +894,8 @@ def hook_command_managed(
             continue
         if normalized not in expected:
             continue
-        interpreter = Path(tokens[index - 1]).name
+        interpreter_index = index - 2 if index >= 2 and tokens[index - 1] == "-I" else index - 1
+        interpreter = Path(tokens[interpreter_index]).name
         if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", interpreter):
             return True
     return False

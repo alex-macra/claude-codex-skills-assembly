@@ -814,6 +814,7 @@ class InstallerTests(unittest.TestCase):
             for item in group.get("hooks", [])
         ]
         self.assertTrue(all(str(installer.PYTHON) in item["command"] for item in installed))
+        self.assertTrue(all(" -I " in item["command"] for item in installed))
         timeouts = {
             Path(item["command"].split()[-1]).name: item["timeout"]
             for item in installed

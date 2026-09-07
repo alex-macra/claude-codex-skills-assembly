@@ -47,7 +47,8 @@ def run_hook(filename: str, payload: str, args: list[str] | None = None) -> subp
 
 class ActivationTests(unittest.TestCase):
     def test_default_catalog_routes_a_generic_prompt(self) -> None:
-        entries = activation.registry()
+        with patch.object(activation, "project_rule_paths", return_value=[]):
+            entries = activation.registry()
         self.assertIn("fast-pr-workflow", activation.match_skills("create PR for this", entries))
 
     def test_catalog_environment_is_ordered_and_repeatable(self) -> None:
@@ -77,7 +78,10 @@ class ActivationTests(unittest.TestCase):
                 encoding="utf-8",
             )
             value = os.pathsep.join((str(ROOT / "catalog.json"), str(catalog)))
-            with patch.dict(os.environ, {"AI_SKILLS_CATALOGS": value}):
+            with (
+                patch.dict(os.environ, {"AI_SKILLS_CATALOGS": value}),
+                patch.object(activation, "project_rule_paths", return_value=[]),
+            ):
                 entries = activation.registry()
 
         self.assertIn("fast-pr-workflow", entries)
@@ -153,6 +157,93 @@ class ActivationTests(unittest.TestCase):
         }
 
         self.assertEqual([], activation.select("sample route", entries, set()))
+
+    def test_prompt_exclusion_suppresses_keyword_and_intent_activation(self) -> None:
+        entries = {
+            "sample-skill": {
+                "promptTriggers": {
+                    "keywords": ["sample route"],
+                    "intentPatterns": [r"run.*sample"],
+                    "excludePatterns": [r"do not.*sample"],
+                },
+            }
+        }
+
+        self.assertEqual(
+            [],
+            activation.match_skills("Do not run the sample route", entries),
+        )
+
+    def test_prompt_matching_uses_one_bounded_scope_for_all_trigger_kinds(self) -> None:
+        entries = {
+            "sample-skill": {
+                "promptTriggers": {
+                    "keywords": ["sample route"],
+                    "intentPatterns": [r"run.*sample"],
+                    "excludePatterns": [r"do not.*sample"],
+                },
+            }
+        }
+        prefix = "x" * (activation.MAX_INTENT_PROMPT_CHARS + 8)
+
+        self.assertEqual(
+            [],
+            activation.match_skills(prefix + " Do not run the sample route", entries),
+        )
+        self.assertEqual(
+            [],
+            activation.match_skills(prefix + " Run the sample route", entries),
+        )
+
+    def test_prompt_exclusion_allows_a_later_positive_clause(self) -> None:
+        entries = {
+            "sample-skill": {
+                "promptTriggers": {
+                    "keywords": ["sample route"],
+                    "intentPatterns": [r"run.*sample"],
+                    "excludePatterns": [r"do not[^.]*sample[^.]*"],
+                },
+            }
+        }
+
+        self.assertEqual(
+            ["sample-skill"],
+            activation.match_skills(
+                "Do not run the sample route for legacy. Run the sample route for replacement.",
+                entries,
+            ),
+        )
+
+    def test_apostrophe_normalization_applies_to_exclusions(self) -> None:
+        entries = {
+            "sample-skill": {
+                "promptTriggers": {
+                    "keywords": ["sample route"],
+                    "excludePatterns": [r"don't run.*sample"],
+                },
+            }
+        }
+
+        self.assertEqual(
+            [],
+            activation.match_skills("Don’t run the sample route", entries),
+        )
+
+    def test_prompt_exclusion_does_not_disable_file_activation(self) -> None:
+        entries = {
+            "sample-skill": {
+                "promptTriggers": {
+                    "keywords": ["sample route"],
+                    "excludePatterns": [r"do not.*sample"],
+                },
+                "fileTriggers": {"pathPatterns": ["*.md"]},
+            }
+        }
+
+        self.assertEqual(
+            ["sample-skill"],
+            activation.match_skills("Do not run sample route; inspect input.md", entries),
+        )
 
     def test_agents_home_is_included_in_available_skills(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
