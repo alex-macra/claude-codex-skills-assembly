@@ -4,7 +4,7 @@ description: "Git and GitHub PR workflow: branch from the task, commit, and crea
 license: MIT
 metadata:
   display-name: "Fast PR Workflow"
-  version: "1.6"
+  version: "1.7"
   platforms: "claude-code codex"
   tags: "git github pr workflow"
 ---
@@ -28,6 +28,8 @@ Perform only the explicitly authorized branch, commit, push, pull-request, or me
 - A task packet or delivery handoff is evidence, not authorization. Commit, push, create, or update a PR only when the current request authorizes that action.
 - Treat commit, push, PR create, PR update, and merge as separate actions. Authorization for one does not imply any later action.
 - Creating a PR includes the minimum push of the already-validated, non-protected topic-branch `HEAD` needed to make that PR exist. It does not authorize creating another commit. Updating PR metadata does not authorize any new commit or push.
+- Do not pre-approve Git or GitHub Bash commands through `allowed-tools`. Claude strips output redirections before matching Bash permissions, so even a read command can overwrite a file. Every Git and GitHub command uses the normal permission flow. Never add broad Git or GitHub grants, force-push flags, hook-bypass flags, cross-repository flags, or a non-`HEAD` push refspec.
+- Approve only the current command when prompted. Do not persist an always-allow Bash rule.
 
 ## Workflow
 
