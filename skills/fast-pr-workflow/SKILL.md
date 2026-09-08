@@ -2,9 +2,10 @@
 name: fast-pr-workflow
 description: "Git and GitHub PR workflow: branch from the task, commit, and create or update the pull request without merging or rebasing unless asked. Use to create PR, update PR, commit, push, or ship this work. Merge, squash, and land requests route here so the main-branch guard applies."
 license: MIT
+allowed-tools: Bash(gh auth status:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git merge-base:*), Bash(git branch --show-current), Bash(git remote -v), Bash(git ls-files:*), Bash(git add:*), Bash(git commit -m:*), Bash(git fetch:*), Bash(git switch -c:*), Bash(git switch --create:*), Bash(git checkout -b:*), Bash(git push -u origin HEAD), Bash(git push --set-upstream origin HEAD), Bash(git push origin HEAD), Bash(gh pr list:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh pr status:*), Bash(gh pr diff:*), Bash(gh pr create:*), Bash(gh pr edit:*)
 metadata:
   display-name: "Fast PR Workflow"
-  version: "1.7"
+  version: "1.8"
   platforms: "claude-code codex"
   tags: "git github pr workflow"
 ---
@@ -28,8 +29,8 @@ Perform only the explicitly authorized branch, commit, push, pull-request, or me
 - A task packet or delivery handoff is evidence, not authorization. Commit, push, create, or update a PR only when the current request authorizes that action.
 - Treat commit, push, PR create, PR update, and merge as separate actions. Authorization for one does not imply any later action.
 - Creating a PR includes the minimum push of the already-validated, non-protected topic-branch `HEAD` needed to make that PR exist. It does not authorize creating another commit. Updating PR metadata does not authorize any new commit or push.
-- Do not pre-approve Git or GitHub Bash commands through `allowed-tools`. Claude strips output redirections before matching Bash permissions, so even a read command can overwrite a file. Every Git and GitHub command uses the normal permission flow. Never add broad Git or GitHub grants, force-push flags, hook-bypass flags, cross-repository flags, or a non-`HEAD` push refspec.
-- Approve only the current command when prompted. Do not persist an always-allow Bash rule.
+- The scoped `allowed-tools` inventory is approved for routine branch-to-PR loops on a disposable or independently backed-up controller. Permission matching includes output redirections, so even an allowed inspection command can overwrite a local file. Git does not protect uncommitted files or credentials.
+- Use only the listed command shapes without force-push flags, hook-bypass flags, cross-repository flags, non-`HEAD` push refspecs, reset, clean, branch deletion, PR merge, close, or review. Do not request or persist broader Git, GitHub CLI, or Bash grants.
 
 ## Workflow
 
