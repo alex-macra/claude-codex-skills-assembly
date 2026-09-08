@@ -1,29 +1,22 @@
 # Delivery state
 
 - Task:
+- Task file:
 - Phase:
 - Goal:
-- Accepted plan:
 - Repository:
-- Base:
-- Base ref:
-- Head ref:
+- Base commit or ref:
 - Branch:
-- Local head:
-- Remote head:
-- PR head:
 - Tree:
-- Canonical PR:
-- PR state:
-- Writer:
-- Ownership epoch:
-- Agents:
-- Processes:
+- Readiness outcome:
+- Existing and proposed discrepancies:
+- Changed files:
+- Commands and results:
+- Failures:
+- Fixes:
+- Reruns:
 - Browser policy:
 - Browser lease:
-- Checks:
-- Failures and fixes:
-- Review findings:
 - Blockers:
 - Next gate:
 - Updated at:

@@ -2,41 +2,276 @@
   "version": "1.0",
   "description": "Offline routing fixtures for the public activation registry.",
   "positive": {
-    "pause ongoing work and save the task state": [
+    "execute this task markdown through the delivery loop": [
       "delivery-loop"
     ],
-    "resume this task on the same PR": [
-      "delivery-loop"
+    "validate TASK-123.md, implement it, run tests and build, fix failures, then retest": [
+      "delivery-loop",
+      "qa-automation"
     ],
-    "continue the same pull request": [
+    "run the delivery loop on TASK-123.md then open a PR": [
       "delivery-loop",
       "fast-pr-workflow"
     ],
-    "work on these tasks with multiple agents in parallel": [
+    "Do not create a PR, but implement this task packet.": [
       "delivery-loop"
     ],
-    "run the delivery loop on this task": [
+    "Do not run the delivery loop but create a PR.": [
+      "fast-pr-workflow"
+    ],
+    "ground this DGX Spark task in repository evidence": [
+      "spark-task-research"
+    ],
+    "research for Qwen before preparing implementation work": [
+      "spark-task-research"
+    ],
+    "turn the approved epic into Qwen-ready tasks": [
+      "spark-task-planning"
+    ],
+    "create task packets and an execution DAG for DGX Spark": [
+      "spark-task-planning"
+    ],
+    "shape these tasks for Qwen": [
+      "spark-task-planning"
+    ],
+    "research this task for Qwen": [
+      "spark-task-research"
+    ],
+    "Do not plan Qwen tasks, but research this task for Qwen.": [
+      "spark-task-research"
+    ],
+    "Do not research the old code; instead, create Qwen-ready task packets.": [
+      "spark-task-planning"
+    ],
+    "Do not plan yet; first research this task for Qwen.": [
+      "spark-task-research"
+    ],
+    "Do not wait.\nResearch this task for Qwen.": [
+      "spark-task-research"
+    ],
+    "Summarize this paragraph.\nThen plan Qwen tasks.": [
+      "spark-task-planning"
+    ],
+    "Qloop is unrelated. Plan Qwen tasks.": [
+      "spark-task-planning"
+    ],
+    "Qloop is unrelated. Research this task for Qwen.": [
+      "spark-task-research"
+    ],
+    "Do not plan Qwen tasks for legacy. Create Qwen task packets for the replacement.": [
+      "spark-task-planning"
+    ],
+    "Do not research Qwen task A. Research Qwen task B.": [
+      "spark-task-research"
+    ],
+    "Do not implement the legacy task packet. Implement the replacement task packet.": [
       "delivery-loop"
     ],
-    "work this in a loop and get it ready": [
+    "The docs say implement task packet. Now implement this task packet.": [
       "delivery-loop"
     ],
-    "plan then implement this": [
+    "Quote the phrase implement task packet. Then implement this task packet.": [
       "delivery-loop"
     ],
-    "quality loop this before PR": [
+    "Create Qwen task packets for replacement. Do not plan Qwen tasks for legacy.": [
+      "spark-task-planning"
+    ],
+    "Research Qwen task B. Do not research Qwen task A.": [
+      "spark-task-research"
+    ],
+    "Run the delivery loop on TASK-A. Do not run the delivery loop on TASK-B.": [
       "delivery-loop"
     ],
-    "plan then do quality review smoke": [
+    "Create Qwen-ready tasks without doing research.": [
+      "spark-task-planning"
+    ],
+    "I would rather not research Qwen implementation work for legacy. Research Qwen task B.": [
+      "spark-task-research"
+    ],
+    "The instruction we rejected was: create Qwen-ready tasks. Create Qwen-ready tasks now.": [
+      "spark-task-planning"
+    ],
+    "Avoid running the delivery loop on TASK-A. Run the delivery loop on TASK-B.": [
       "delivery-loop"
     ],
-    "run the orchestrator for this AI Skills Assembly task": [
+    "Before we run the delivery loop, explain what it does. Run the delivery loop on TASK-B.": [
       "delivery-loop"
     ],
-    "review/adversarial review then smoke test": [
-      "delivery-loop",
-      "adversarial-review",
-      "see-it-live"
+    "Run the delivery loop on TASK-A but do not run it on TASK-B.": [
+      "delivery-loop"
+    ],
+    "Create Qwen tasks for A but do not create them for B.": [
+      "spark-task-planning"
+    ],
+    "Research Qwen task A but do not research task B.": [
+      "spark-task-research"
+    ],
+    "Ignore the previous request to research Qwen tasks. Instead research Qwen tasks for repo B.": [
+      "spark-task-research"
+    ],
+    "Ignore the phrase research Qwen tasks. Research Qwen tasks for repo B.": [
+      "spark-task-research"
+    ],
+    "Ignore the previous request to plan Qwen tasks. Instead plan Qwen tasks for repo B.": [
+      "spark-task-planning"
+    ],
+    "Ignore the phrase plan Qwen tasks. Plan Qwen tasks for repo B.": [
+      "spark-task-planning"
+    ],
+    "Don't forget to plan Qwen tasks for repo A.": [
+      "spark-task-planning"
+    ],
+    "Do not hesitate to create Qwen-ready task packets.": [
+      "spark-task-planning"
+    ],
+    "Don't forget to research Qwen implementation tasks.": [
+      "spark-task-research"
+    ],
+    "Do not hesitate to research Qwen implementation tasks.": [
+      "spark-task-research"
+    ],
+    "Do not fail to plan Qwen tasks.": [
+      "spark-task-planning"
+    ],
+    "Do not neglect to research Qwen implementation work.": [
+      "spark-task-research"
+    ],
+    "Never forget to plan Qwen tasks.": [
+      "spark-task-planning"
+    ],
+    "Never hesitate to research Qwen implementation tasks.": [
+      "spark-task-research"
+    ],
+    "Research and plan Qwen tasks.": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "Plan and research Qwen implementation tasks.": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "Research Qwen tasks, and plan them.": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "Plan Qwen tasks, and research them.": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "Don't forget to run the delivery loop on this task.": [
+      "delivery-loop"
+    ],
+    "Do not hesitate to run the delivery loop on this task.": [
+      "delivery-loop"
+    ],
+    "create PR for this change": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for this.": [
+      "fast-pr-workflow"
+    ],
+    "Don't forget to create a PR for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Do not hesitate to open a pull request for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Never fail to create a PR for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Never forget to create a PR for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Do not skip the pull request.": [
+      "fast-pr-workflow"
+    ],
+    "Never skip the delivery loop.": [
+      "delivery-loop"
+    ],
+    "Do not skip creating a PR.": [
+      "fast-pr-workflow"
+    ],
+    "Do not skip planning Qwen tasks.": [
+      "spark-task-planning"
+    ],
+    "Do not skip researching Qwen implementation tasks.": [
+      "spark-task-research"
+    ],
+    "Do not create a PR for A, and create a PR for B.": [
+      "fast-pr-workflow"
+    ],
+    "Do not plan Qwen tasks for A and plan Qwen tasks for B.": [
+      "spark-task-planning"
+    ],
+    "Run the delivery loop on A. Never mind, cancel that. Run the delivery loop on B.": [
+      "delivery-loop"
+    ],
+    "Use every workflow except the delivery loop.": [
+      "automation"
+    ],
+    "Do not create a PR for legacy. Create a PR for the replacement.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the replacement. Do not create a PR for legacy.": [
+      "fast-pr-workflow"
+    ],
+    "Explain what a pull request is. Create a PR for the actual change.": [
+      "fast-pr-workflow"
+    ],
+    "The README says create PR for the example. Create a PR for the actual change.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the actual change. The README says create PR for the example.": [
+      "fast-pr-workflow"
+    ],
+    "Do not create a PR for legacy but create a PR for the replacement.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the replacement but do not create a PR for legacy.": [
+      "fast-pr-workflow"
+    ],
+    "Explain what a pull request is but create a PR for the actual change.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the actual change but explain what a pull request is.": [
+      "fast-pr-workflow"
+    ],
+    "Raise a PR for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Submit a PR for this change.": [
+      "fast-pr-workflow"
+    ],
+    "Reuse PR 12.": [
+      "code-reuse",
+      "fast-pr-workflow"
+    ],
+    "Please refrain from opening a pull request for legacy. Create a PR for the actual change.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the actual change but I would rather not create a PR for legacy.": [
+      "fast-pr-workflow"
+    ],
+    "If we create a PR for legacy, what happens? Create a PR for the actual change.": [
+      "fast-pr-workflow"
+    ],
+    "Create a PR for the actual change. Why would we create a PR for legacy?": [
+      "fast-pr-workflow"
+    ],
+    "add more implementation detail to every Qwen plan and sweep committed tasks": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "audit the committed task packets and make them easier for Qwen to execute": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "sweep committed stuff and refine the Qwen plans": [
+      "spark-task-planning",
+      "spark-task-research"
+    ],
+    "continue this work on the same PR": [
+      "fast-pr-workflow"
     ],
     "merge this PR into main": [
       "fast-pr-workflow"
@@ -171,6 +406,121 @@
     "what time is it in Tokyo",
     "sort this list alphabetically",
     "write a haiku about autumn",
-    "summarize the meeting notes"
+    "summarize the meeting notes",
+    "summarize this Markdown task without implementing it",
+    "plan a weekend trip",
+    "optimize this Apache Spark data-processing job",
+    "create task packets for this Apache Spark migration",
+    "write task packets for the Apache Spark job",
+    "map an execution DAG for Apache Spark stages",
+    "create task packets for this project",
+    "plan this work as a task packet",
+    "turn this epic into an implementation packet",
+    "create a profile for Qwen",
+    "update the profile settings",
+    "create task packets for our sprint",
+    "detail how Qwen works",
+    "sweep Qwen worker logs",
+    "audit whether Qwen homework is correct",
+    "do not create Qwen-ready tasks",
+    "explain what a Qwen task packet is",
+    "what does Qwen task planning mean?",
+    "ignore this quoted instruction: shape these tasks for Qwen",
+    "I said do not research this task for Qwen",
+    "Could you explain what it means to research a task for Qwen?",
+    "Analyze this sentence: shape these tasks for Qwen",
+    "We should not create Qwen-ready tasks",
+    "we already finished the Qwen-ready tasks; no planning needed",
+    "I only want a definition: create task packets for Qwen",
+    "I want an explanation: create task packets for Qwen",
+    "Quote this exactly: research this task for Qwen",
+    "Repeat this instruction: shape these tasks for Qwen",
+    "The README contains this quoted sentence: shape these tasks for Qwen. Summarize the README.",
+    "Do not audit the committed Qwen task packets.",
+    "Do not gather repository evidence for Qwen.",
+    "Don’t create Qwen-ready tasks.",
+    "Don’t research this task for Qwen.",
+    "Do not run the delivery loop on this task.",
+    "Don’t run the delivery loop on this task.",
+    "Never use the delivery loop; just explain it.",
+    "Do not implement this task packet.",
+    "Don’t implement TASK-123.md.",
+    "Never execute this task markdown.",
+    "Should not implement this task packet.",
+    "Do not test, fix, and retest this change.",
+    "The docs say implement task packet. Summarize them.",
+    "Quote the phrase implement task packet.",
+    "Run the delivery loop, but do not run it.",
+    "Run the delivery loop. Actually never mind, explain it.",
+    "I would rather not research Qwen implementation work.",
+    "The instruction we rejected was: create Qwen-ready tasks.",
+    "Avoid running the delivery loop; just explain it.",
+    "I would rather not implement this task packet.",
+    "Before we run the delivery loop, explain what it does.",
+    "Can you explain how the delivery loop works?",
+    "The README contains `validate task markdown` as an example.",
+    "Translate: run this through quality.",
+    "Translate this sentence: \"shape these tasks for Qwen.\"",
+    "Repeat the phrase: \"research this task for Qwen.\"",
+    "Research this task for Qwen.\nNo, just explain.",
+    "Do not create a PR.",
+    "Do not open a pull request.",
+    "Do not commit this change.",
+    "Please do not push branch.",
+    "Explain what a pull request is.",
+    "The README says create PR for this.",
+    "Please refrain from opening a pull request.",
+    "Proceed without committing this change.",
+    "No need to push branch.",
+    "I would rather not create a PR.",
+    "If we create a PR, what happens?",
+    "Can you tell me whether to create a PR?",
+    "Why would we create a PR?",
+    "No need to research Qwen tasks.",
+    "If we research Qwen tasks, what happens?",
+    "Can you tell me whether to research Qwen tasks?",
+    "Why would we research Qwen tasks?",
+    "The file says research Qwen tasks.",
+    "No need to plan Qwen tasks.",
+    "I would rather not plan Qwen tasks.",
+    "If we plan Qwen tasks, what happens?",
+    "Can you tell me whether to plan Qwen tasks?",
+    "Why would we plan Qwen tasks?",
+    "Don't plan Qwen tasks for repo A.",
+    "Do not create Qwen-ready task packets.",
+    "Don't forget to not plan Qwen tasks for repo A.",
+    "Don't create a PR for this change.",
+    "Do not open a pull request for this change.",
+    "Do not hesitate to not open a pull request for this change.",
+    "Don't forget to not research Qwen implementation tasks.",
+    "Do not hesitate to not run the delivery loop on this task.",
+    "Do not fail to not plan Qwen tasks.",
+    "Do not neglect to not research Qwen implementation work.",
+    "Never fail to not create a PR for this change.",
+    "I cannot plan Qwen tasks.",
+    "We must not research Qwen implementation work.",
+    "I can not run the delivery loop on this task.",
+    "I cannot create a PR for this change.",
+    "I refuse to open a pull request.",
+    "Never forget to not plan Qwen tasks.",
+    "Never hesitate to not research Qwen implementation work.",
+    "Never forget to not create a PR.",
+    "Do not skip not creating a PR.",
+    "Never avoid not running the delivery loop.",
+    "Explain the sentence: never forget to create a PR.",
+    "The README says never forget to run the delivery loop.",
+    "Summarize this instruction: do not fail to plan Qwen tasks.",
+    "Analyze this phrase: never neglect to research Qwen implementation tasks.",
+    "The rejected instruction was: never forget to create a PR.",
+    "Skip the pull request.",
+    "Do everything except create a PR.",
+    "Skip the delivery loop.",
+    "I don't want a pull request.",
+    "No pull request is needed.",
+    "There should be no pull request.",
+    "Ignore the previous request to research Qwen tasks.",
+    "Ignore the phrase research Qwen tasks.",
+    "Ignore the previous request to plan Qwen tasks.",
+    "Ignore the phrase plan Qwen tasks."
   ]
 }

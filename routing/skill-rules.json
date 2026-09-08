@@ -232,42 +232,45 @@
     "delivery-loop": {
       "type": "process",
       "priority": "high",
-      "description": "Bounded delivery conductor with one writer, durable pause and resume state, focused verification, ordered reviews, PR shipping, and remote-head verification.",
+      "description": "Execute approved task Markdown through repository validation, implementation, test/build, and bounded fix/retest before an optional PR handoff.",
       "promptTriggers": {
         "keywords": [
           "delivery loop",
           "quality loop",
-          "review loop",
-          "plan to implementation",
-          "plan-to-implementation",
+          "execute task markdown",
+          "validate task markdown",
+          "implement task packet",
+          "test build fix retest",
+          "test-build-fix-retest",
+          "fix and retest",
           "verify fix rerun",
           "verify/fix/rerun",
-          "PR readiness",
-          "pr readiness",
-          "ready for PR",
-          "ready for pr",
-          "run this through quality",
-          "before PR",
-          "before pr",
-          "from planning to implementation",
-          "work this in a loop",
-          "run the orchestrator"
+          "run this through quality"
         ],
         "intentPatterns": [
-          "(run|take|move).*?(through|from).*?(delivery|quality|review).*?(loop|gate|workflow)",
-          "(work|run|take).*?(this|task|change|work).*?(in|through).*?(a )?loop",
-          "(run|use|start).*?(orchestrator|conductor).*?(task|change|work|workflow)",
-          "(plan|planning).*?(to|through).*?(implementation|implement)",
-          "(plan|planning).*?(then|and).*?(implementation|implement|build)",
-          "(plan|planning).*?(then|and|do).*?(quality|review|smoke)",
-          "(verify|test|check).*?(fix|repair).*?(rerun|re-run|again)",
-          "(review|adversarial review).*?(then|and).*?(smoke|smoke test)",
-          "(quality|review|smoke|security|a11y|accessibility).*?(before|for).*?(PR|pr|pull request)",
-          "(prepare|make|get).*?(ready).*?(PR|pr|pull request)",
-          "^(please |let.?s )?(pause|stop).*?\\b(ongoing|current|this)\\b.*?\\b(work|task|loop)\\b",
-          "^(please |let.?s )?(resume|continue).*?(\\b(task|work|loop)\\b|pull request|\\b(PR|pr)\\b)",
-          "^(please |let.?s )?(use|run) (multiple|parallel) agents( in parallel)?",
-          "^(please |let.?s )?work.*?(task|tasks|work|change|changes).*?with (multiple|parallel) agents"
+          "(run|take|work).*?(through|in).*?(delivery|quality).*?loop",
+          "(validate|check).*?(task|ticket).*?(markdown|[.]md).*?(implement|execute|deliver)",
+          "(implement|execute|deliver|run).*?(task|ticket).*?(markdown|[.]md|packet)",
+          "(test|build|verify|check).*?(fix|repair).*?(retest|rerun|re-run|again)"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,100}\\b(?:skip(?:ped|s|ping)?|except)\\b[^.;\\n]{0,80}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:run|use|start|execute|invoke|take|work)\\b[^.;\\n]{0,100}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:implement|execute|deliver)\\b[^.;\\n]{0,100}\\b(?:task|ticket)\\b[^.;\\n]{0,60}(?:\\b(?:markdown|packet)\\b|[.]md\\b)[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:test|build|verify|check)\\b[^.;\\n]{0,80}\\b(?:fix|repair)\\b[^.;\\n]{0,80}\\b(?:retest|rerun|re-run)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A(?![^.;\\n]{0,80}\\b(?:but|instead)\\b)|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't|don’t)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b))\\b[^.;\\n]{0,60}\\b(?:run|use|start|execute|invoke|take|work)\\b[^.;\\n]{0,100}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never)\\s+(?:forget|hesitate|fail|neglect)\\s+to\\s+(?:not|never|avoid)\\s+(?:run|use|start|execute|invoke|take|work)\\b[^.;\\n]{0,100}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:avoid(?:ed|ing)?|would rather not)\\b[^.;\\n]{0,60}\\b(?:run|running|use|using|start|starting|execute|executing|invoke|invoking|take|taking|work|working)\\b[^.;\\n]{0,100}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never|should not)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)\\b[^.;\\n]{0,60}\\b(?:implement|execute|deliver)\\b[^.;\\n]{0,100}\\b(?:task|ticket)\\b[^.;\\n]{0,60}(?:\\b(?:markdown|packet)\\b|[.]md\\b)[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:avoid(?:ed|ing)?|would rather not)\\b[^.;\\n]{0,60}\\b(?:implement|implementing|execute|executing|deliver|delivering)\\b[^.;\\n]{0,100}\\b(?:task|ticket)\\b[^.;\\n]{0,60}(?:\\b(?:markdown|packet)\\b|[.]md\\b)[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never|should not)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)\\b[^.;\\n]{0,60}\\b(?:test|build|verify|check)\\b[^.;\\n]{0,80}\\b(?:fix|repair)\\b[^.;\\n]{0,80}\\b(?:retest|rerun|re-run)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)\\s*(?:before|if)\\b[^.;\\n]{0,100}\\b(?:run|use|start|execute|invoke)\\b[^.;\\n]{0,80}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]{0,120}\\b(?:explain|describe|summarize|define)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)\\A[^.;\\n]{0,120}\\b(?:delivery|quality)\\s+loop\\b[^.;\\n]{0,80}\\b(?:do not|don't|don’t|should not|never)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)\\b[^.;\\n]{0,40}\\b(?:run|use|execute|invoke)\\s+it\\b\\s*(?=[.;\\n]|\\Z)",
+          "(?is)(?:[.!?;]|\\n)\\s*(?:actually\\s+)?never mind\\b[^;\\n]{0,120}\\b(?:explain|describe|summarize|stop|cancel)\\b[^;\\n]*\\Z",
+          "(?is)\\A.{0,40}\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize)\\b[^.;\\n]{0,240}\\b(?:implement|execute|deliver)\\b[^.;\\n]{0,100}\\b(?:task|ticket)\\b[^.;\\n]{0,60}(?:\\b(?:markdown|packet)\\b|[.]md\\b)",
+          "(?is)\\A[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:says?|contains?|includes?|quotes?)\\b[^.;\\n]{0,180}\\b(?:implement|execute|deliver)\\b[^.;\\n]{0,100}\\b(?:task|ticket)\\b[^.;\\n]{0,60}(?:\\b(?:markdown|packet)\\b|[.]md\\b)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,40}\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize)\\b[^.;\\n]{0,240}(?:\\b(?:delivery|quality)\\s+loop\\b|\\bvalidate\\s+task\\s+markdown\\b|\\brun\\s+this\\s+through\\s+quality\\b)[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:says?|contains?|includes?|quotes?)\\b[^.;\\n]{0,180}(?:\\b(?:delivery|quality)\\s+loop\\b|\\bvalidate\\s+task\\s+markdown\\b|\\brun\\s+this\\s+through\\s+quality\\b)[^.;\\n]*(?=[.;\\n]|\\Z)"
         ]
       },
       "fileTriggers": {
@@ -323,10 +326,6 @@
       "description": "Fast branch, commit, push, and PR create/update workflow for clean task work.",
       "promptTriggers": {
         "keywords": [
-          "create PR",
-          "update PR",
-          "open PR",
-          "prepare PR",
           "PR body",
           "pull request",
           "commit this",
@@ -339,22 +338,44 @@
           "make a branch",
           "gh pr create",
           "gh pr edit",
-          "merge PR",
           "merge pull request",
           "merge to main",
           "merge into main",
           "main branch",
-          "squash PR",
           "squash merge",
-          "land PR",
-          "promote dev"
+          "promote dev",
+          "reuse same PR",
+          "continue same PR"
         ],
         "intentPatterns": [
-          "(create|open|prepare|update).*?(PR|pull request)",
+          "(create|open|prepare|update|raise|submit).*?(\\bPR\\b|pull request)",
+          "(?is)\\b(?:do not|don't|never)\\s+skip\\s+(?:creating|opening|preparing|updating|raising|submitting)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b",
           "(commit|stage|push).*?(change|changes|work|this|branch)",
           "(make|create|checkout).*?(branch).*?(task|ticket|name)",
-          "(ship|wrap up|finish).*?(task|work|PR|branch)",
-          "(merge|squash|land|promote).*?(#\\d+|PR|pull request|it|this|main|master|branch)"
+          "\\b(ship|wrap up|finish)\\b.*?(task|work|\\bPR\\b|branch)",
+          "(merge|squash|land|promote).*?(#\\d+|\\bPR\\b|pull request|it|this|main|master|branch)",
+          "(reuse|continue|update).*?(same|existing).*?(\\bPR\\b|pull request)",
+          "\\breuse\\b.*?(\\bPR\\b|pull request)"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,100}\\b(?:skip(?:ped|s|ping)?|avoid(?:ed|s|ing)?)\\b[^.;\\n]{0,80}\\b(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,100}\\bexcept\\b[^.;\\n]{0,80}\\b(?:create|open|prepare|update|raise|submit|merge|squash|land)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:create|open|prepare|update|raise|submit|merge|squash|land)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,80}\\b(?:commit|stage|push)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b))\\b[^.;\\n]{0,60}\\b(?:create|open|prepare|update|raise|submit|merge|squash|land)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b))\\b[^.;\\n]{0,80}\\b(?:commit|stage|push)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never)\\s+(?:forget|hesitate|fail|neglect)\\s+to\\s+(?:not|never|avoid)\\s+(?:create|open|prepare|update|raise|submit|merge|squash|land)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t)\\s+(?:want|need)\\s+(?:a\\s+|an\\s+)?(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\bno\\s+(?:PR|pull request)\\s+(?:is\\s+)?(?:needed|required|wanted|necessary)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\bthere\\s+(?:should|must)\\s+be\\s+no\\s+(?:PR|pull request)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:please\\s+refrain|refrain)\\s+from\\s+(?:create|creating|open|opening|prepare|preparing|update|updating|raise|raising|submit|submitting|merge|merging|squash|squashing|land|landing)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:i|we)\\s+would\\s+rather\\s+not\\s+(?:create|creating|open|opening|prepare|preparing|update|updating|raise|raising|submit|submitting|merge|merging|squash|squashing|land|landing)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)no\\s+need\\s+to\\s+(?:create|creating|open|opening|prepare|preparing|update|updating|raise|raising|submit|submitting|merge|merging|squash|squashing|land|landing)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)no\\s+need\\s+to\\s+(?:commit|committing|stage|staging|push|pushing)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:please\\s+proceed|proceed)\\s+without\\s+(?:commit|committing|stage|staging|push|pushing)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:if|whether|why)\\b[^.;\\n]{0,120}\\b(?:create|open|prepare|update|raise|submit)\\b[^.;\\n]{0,100}\\b(?:PR|pull request)\\b[^.;?\\n]*?(?=[?])",
+          "(?is)(?:\\A(?![^.;\\n]{0,80}?\\b(?:but|instead)\\b[^.;\\n]{0,80}?\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize)\\b)|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,40}?\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize)\\b[^.;\\n]{0,200}?\\b(?:PR|pull request|commit|push(?:\\s+branch)?)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A(?![^.;\\n]{0,120}?\\b(?:but|instead)\\b[^.;\\n]{0,120}?\\b(?:readme|docs?|documentation|file|text)\\b)|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,100}?\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,160}?\\b(?:says?|contains?|includes?|quotes?|quoted?|example|sentence|instruction|phrase)\\b[^.;\\n]{0,180}?\\b(?:PR|pull request|commit|push(?:\\s+branch)?)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)"
         ]
       },
       "fileTriggers": {
@@ -521,14 +542,81 @@
         "pathPatterns": []
       }
     },
+    "spark-task-planning": {
+      "type": "process",
+      "priority": "high",
+      "description": "Turn approved architecture and repository evidence into dependency-ordered, Qwen-ready DGX Spark task packets with no unresolved design choices.",
+      "promptTriggers": {
+        "keywords": [],
+        "intentPatterns": [
+          "(?is)\\b(?:plan|decompose|break down|shape|improve|write|create|prepare)\\b.{0,180}(?:(?:DGX Spark|Qwen).{0,180}\\b(?:tasks?|packets?|plans?|epics?|work)\\b|\\b(?:tasks?|packets?|plans?|epics?|work)\\b.{0,180}(?:DGX Spark|Qwen))",
+          "(?is)\\b(?:do not|don't|never)\\s+skip\\s+(?:planning|decomposing|shaping|improving|writing|creating|preparing)\\b.{0,180}(?:(?:DGX Spark|Qwen).{0,180}\\b(?:tasks?|packets?|plans?|epics?|work)\\b|\\b(?:tasks?|packets?|plans?|epics?|work)\\b.{0,180}(?:DGX Spark|Qwen))",
+          "(?is)\\b(?:turn|convert)\\b.{0,160}\\b(?:research|plan|epic|architecture)\\b.{0,160}(?:DGX Spark|Qwen)",
+          "(?is)\\b(?:DGX Spark|Qwen)\\b.{0,120}\\b(?:tasks?|packets?|plans?|work)\\b.{0,80}\\b(?:and|then)\\s+(?:plan|decompose|shape|improve|write|create|prepare)\\s+(?:them|it|those)\\b",
+          "(?is)\\A(?=.*\\b(?:DGX Spark|Qwen)\\b)(?=.*\\b(?:packets?|plans?|epics?)\\b).*?\\b(?:audit|review|sweep|refine|expand|detail|enrich)\\b"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:plan|create|write|shape|improve|prepare|turn|convert|decompose)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A(?![^.;\\n]{0,80}\\b(?:but|instead)\\b)|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|would rather not|no need to)\\b[^.;\\n]{0,60}\\b(?:plan|create|write|shape|improve|prepare|turn|convert|decompose)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never)\\s+(?:forget|hesitate|fail|neglect)\\s+to\\s+(?:not|never|avoid)\\s+(?:plan|create|write|shape|improve|prepare|turn|convert|decompose)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never|should not)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)\\b[^.;\\n]{0,60}\\b(?:audit|review|sweep|refine|expand|detail|enrich)\\b[^.;\\n]{0,180}\\b(?:qwen|dgx spark)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:if|whether|why)\\b[^.;\\n]{0,120}\\b(?:plan|create|write|shape|improve|prepare|turn|convert|decompose)\\b[^.;?\\n]*?(?=[?])",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:says?|contains?|includes?|quotes?)\\b[^.;\\n]{0,180}\\b(?:plan|create|write|shape|improve|prepare|turn|convert|decompose)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)\\A.{0,40}\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize|ignore)\\b[^.;\\n]{0,240}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A.{0,60}\\b(?:definition|explanation|description|translation|quotation|quote|summary)\\b[^.;\\n]{0,240}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:contains?|includes?)\\b[^.;\\n]{0,50}\\b(?:quoted?|example|sentence|instruction|phrase)\\b[^.;\\n]{0,180}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A\\s*what\\s+(?:does|is)\\b[^.;\\n]{0,180}\\b(?:mean|definition)\\b",
+          "(?is)(?:\\A|[.;\\n]\\s*)(?=[^.;\\n]{0,280}\\b(?:qwen|dgx spark)\\b)(?=[^.;\\n]{0,280}\\b(?:plan|create|write|shape|prepare|decompose|tasks?|packets?)\\b)[^.;\\n]{0,100}\\b(?:instruction|request|prompt|command)\\b[^.;\\n]{0,100}\\b(?:rejected|declined|discarded)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:[.!?;]|\\n).{0,20}\\b(?:no|never mind)\\b[^;\\n]{0,80}\\b(?:explain|describe|summarize|define|stop|cancel)\\b[^;\\n]{0,80}\\Z",
+          "(?is)\\A[^.;\\n]{0,180}\\b(?:no\\s+(?:planning|research)\\s+needed|already\\s+finished)\\b[^.;\\n]*\\Z",
+          "(?is)\\A\\s*(?:(?:please\\s+)?/?qloop\\b(?!\\s+(?:is|was|means|documentation|docs?|notes?|workflow|unrelated)\\b)|(?:(?:can|could|would|will)\\s+you\\s+)?(?:please\\s+)?(?:run|use|start|execute|invoke)\\b[^.;\\n]{0,50}\\b(?:qloop|qwen loop)\\b)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": []
+      }
+    },
+    "spark-task-research": {
+      "type": "process",
+      "priority": "high",
+      "description": "Gather repository-grounded evidence for DGX Spark and Qwen planning by verifying files, symbols, versions, dependencies, commands, and risks.",
+      "promptTriggers": {
+        "keywords": [],
+        "intentPatterns": [
+          "(?is)\\b(?:research|investigate)\\b.{0,180}(?:(?:DGX Spark|Qwen).{0,180}\\b(?:tasks?|implementation|work|plans?)\\b|\\b(?:tasks?|implementation|work|plans?)\\b.{0,180}(?:DGX Spark|Qwen))",
+          "(?is)\\b(?:do not|don't|never)\\s+skip\\s+(?:researching|investigating)\\b.{0,180}(?:(?:DGX Spark|Qwen).{0,180}\\b(?:tasks?|implementation|work|plans?)\\b|\\b(?:tasks?|implementation|work|plans?)\\b.{0,180}(?:DGX Spark|Qwen))",
+          "(?is)\\b(?:DGX Spark|Qwen)\\b.{0,120}\\b(?:tasks?|packets?|plans?|implementation|work)\\b.{0,80}\\b(?:and|then)\\s+(?:research|investigate)\\s+(?:them|it|those)\\b",
+          "(?is)\\b(?:ground|verify|audit)\\b.{0,180}(?:DGX Spark|Qwen).{0,180}\\b(?:tasks?|plans?|packets?)\\b.{0,180}\\b(?:repository|repo|codebase|evidence)\\b",
+          "(?is)\\b(?:prepare|gather)\\b.{0,180}\\b(?:repository|repo|codebase)\\b.{0,80}\\bevidence\\b.{0,180}(?:DGX Spark|Qwen)",
+          "(?is)\\A(?=.*\\b(?:DGX Spark|Qwen)\\b)(?=.*\\b(?:tasks?|packets?|plans?|work|stuff)\\b)(?=.*\\b(?:committed|pinned)\\b).*?\\b(?:audit|review|sweep|verify)\\b"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:research(?:ing)?|investigat(?:e|ing))\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A(?![^.;\\n]{0,80}\\b(?:but|instead)\\b)|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't|don’t)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|would rather not|no need to)\\b[^.;\\n]{0,60}\\b(?:research(?:ing)?|investigat(?:e|ing))\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never)\\s+(?:forget|hesitate|fail|neglect)\\s+to\\s+(?:not|never|avoid)\\s+(?:research|investigate)\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|don’t|never|should not)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)\\b[^.;\\n]{0,60}\\b(?:gather|ground|verify|audit|review|sweep)\\b[^.;\\n]{0,180}\\b(?:qwen|dgx spark)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,80}\\b(?:if|whether|why)\\b[^.;\\n]{0,120}\\b(?:research(?:ing)?|investigat(?:e|ing))\\b[^.;?\\n]*?(?=[?])",
+          "(?is)(?:\\A|[.;\\n]\\s*|\\b(?:but|instead)\\b\\s*)[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:says?|contains?|includes?|quotes?)\\b[^.;\\n]{0,180}\\b(?:research(?:ing)?|investigat(?:e|ing))\\b[^.;\\n]*?(?=\\b(?:but|instead)\\b|[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)(?=[^.;\\n]{0,280}\\b(?:qwen|dgx spark)\\b)[^.;\\n]{0,220}\\bwithout\\s+(?:doing|conducting|performing)\\s+(?:research|researching|investigation|investigating)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)\\A.{0,40}\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize|ignore)\\b[^.;\\n]{0,240}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A.{0,60}\\b(?:definition|explanation|description|translation|quotation|quote|summary)\\b[^.;\\n]{0,240}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:contains?|includes?)\\b[^.;\\n]{0,50}\\b(?:quoted?|example|sentence|instruction|phrase)\\b[^.;\\n]{0,180}\\b(?:qwen|dgx spark|research|planning|plan)\\b",
+          "(?is)\\A\\s*what\\s+(?:does|is)\\b[^.;\\n]{0,180}\\b(?:mean|definition)\\b",
+          "(?is)(?:[.!?;]|\\n).{0,20}\\b(?:no|never mind)\\b[^;\\n]{0,80}\\b(?:explain|describe|summarize|define|stop|cancel)\\b[^;\\n]{0,80}\\Z",
+          "(?is)\\A[^.;\\n]{0,180}\\b(?:no\\s+research\\s+needed|already\\s+finished)\\b[^.;\\n]*\\Z",
+          "(?is)\\A\\s*(?:(?:please\\s+)?/?qloop\\b(?!\\s+(?:is|was|means|documentation|docs?|notes?|workflow|unrelated)\\b)|(?:(?:can|could|would|will)\\s+you\\s+)?(?:please\\s+)?(?:run|use|start|execute|invoke)\\b[^.;\\n]{0,50}\\b(?:qloop|qwen loop)\\b)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": []
+      }
+    },
     "task-research": {
       "type": "process",
       "priority": "medium",
       "description": "Research a task before building - reuse-first codebase scan, source triage, facts vs assumptions, into a short brief.",
       "promptTriggers": {
         "keywords": [
-          "research",
-          "investigate",
           "prior art",
           "look into",
           "find out how",
@@ -540,10 +628,23 @@
           "compare approaches"
         ],
         "intentPatterns": [
+          "(?is)\\b(?:research|investigate)\\b",
           "(research|investigate|look into|dig into).*?(how|whether|options|approach|library|api|pattern)",
           "(how (do|should) (we|i)|what.?s the best way to)",
           "(compare|evaluate|weigh).*?(options|libraries|approaches|tradeoffs)",
           "(is it (possible|feasible)|can we).*?(before we build)"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:research|investigate)\\b[^.;\\n]{0,180}(?:(?:qwen|dgx spark)[^.;\\n]{0,180}\\b(?:tasks?|implementation|work|plans?)\\b|\\b(?:tasks?|implementation|work|plans?)\\b[^.;\\n]{0,180}(?:qwen|dgx spark))[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,160}\\b(?:qwen|dgx spark)\\b[^.;\\n]{0,120}\\b(?:tasks?|packets?|plans?|implementation|work)\\b[^.;\\n]{0,80}\\b(?:and|then)\\s+(?:research|investigate)\\s+(?:them|it|those)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:cannot|can't|can not|must not|will not|won't)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|(?:refuse|refused|refuses|decline|declined|declines|unable)\\s+to)\\b[^.;\\n]{0,60}\\b(?:research(?:ing)?|investigat(?:e|ing)|look into|dig into)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:(?:do not|don't|don’t)(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|never(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|should not(?!\\s+(?:forget|hesitate|fail|neglect|wait)\\s+to\\b)|would rather not)\\b[^.;\\n]{0,60}\\b(?:research(?:ing)?|investigat(?:e|ing)|look into|dig into)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,220}\\bwithout\\s+(?:doing|conducting|performing)\\s+(?:research|researching|investigation|investigating)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)\\A.{0,40}\\b(?:explain|define|describe|translate|quote|repeat|analy[sz]e|parse|classify|summarize|ignore)\\b[^.;\\n]{0,240}\\b(?:research|investigate|look into|dig into)\\b",
+          "(?is)\\A.{0,60}\\b(?:definition|explanation|description|translation|quotation|quote|summary)\\b[^.;\\n]{0,240}\\b(?:research|investigate)\\b",
+          "(?is)\\A[^.;\\n]{0,100}\\b(?:readme|docs?|documentation|file|text)\\b[^.;\\n]{0,80}\\b(?:contains?|includes?)\\b[^.;\\n]{0,50}\\b(?:quoted?|example|sentence|instruction|phrase)\\b[^.;\\n]{0,180}\\b(?:research|investigate|look into|dig into)\\b",
+          "(?is)(?:[.!?;]|\\n).{0,20}\\b(?:no|never mind)\\b[^;\\n]{0,80}\\b(?:explain|describe|summarize|define|stop|cancel)\\b[^;\\n]{0,80}\\Z",
+          "(?is)\\A\\s*(?:(?:please\\s+)?/?qloop\\b(?!\\s+(?:is|was|means|documentation|docs?|notes?|workflow|unrelated)\\b)|(?:(?:can|could|would|will)\\s+you\\s+)?(?:please\\s+)?(?:run|use|start|execute|invoke)\\b[^.;\\n]{0,50}\\b(?:qloop|qwen loop)\\b)"
         ]
       },
       "fileTriggers": {
