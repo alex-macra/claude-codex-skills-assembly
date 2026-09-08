@@ -30,7 +30,7 @@ Perform only the explicitly authorized branch, commit, push, pull-request, or me
 - Treat commit, push, PR create, PR update, and merge as separate actions. Authorization for one does not imply any later action.
 - Creating a PR includes the minimum push of the already-validated, non-protected topic-branch `HEAD` needed to make that PR exist. It does not authorize creating another commit. Updating PR metadata does not authorize any new commit or push.
 - The scoped `allowed-tools` inventory is approved for routine branch-to-PR loops on a disposable or independently backed-up controller. Permission matching includes output redirections, so even an allowed inspection command can overwrite a local file. Git does not protect uncommitted files or credentials.
-- Use only the listed command shapes without force-push flags, hook-bypass flags, cross-repository flags, non-`HEAD` push refspecs, reset, clean, branch deletion, PR merge, close, or review. Do not request or persist broader Git, GitHub CLI, or Bash grants.
+- Action-prefix grants can accept later flags, so the permission engine is not an argument sandbox. Use only the listed command shapes without force-push flags, hook-bypass flags, cross-repository flags, non-`HEAD` push refspecs, reset, clean, branch deletion, PR merge, close, or review. Do not request or persist broader Git, GitHub CLI, or Bash grants.
 
 ## Workflow
 

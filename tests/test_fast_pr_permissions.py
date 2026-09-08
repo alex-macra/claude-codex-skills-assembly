@@ -38,6 +38,7 @@ class FastPrPermissionTests(unittest.TestCase):
     def test_shipping_skill_documents_redirection_risk(self) -> None:
         text = SKILL.read_text(encoding="utf-8")
         self.assertIn("Permission matching includes output redirections", text)
+        self.assertIn("permission engine is not an argument sandbox", text)
         self.assertIn("disposable or independently backed-up controller", text)
         self.assertIn("Git does not protect uncommitted files or credentials", text)
         self.assertIn("Do not request or persist broader", text)
