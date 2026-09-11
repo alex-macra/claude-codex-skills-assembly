@@ -1,6 +1,6 @@
-# AI Skills Assembly
+# AI Skills Assembly for Claude Code and Codex
 
-Reusable skills, deterministic activation, and an installer for agent CLI and agentskills.io-compatible surfaces.
+Reusable agent skills, deterministic activation, safety hooks, and installers for Claude Code and OpenAI Codex, with an agentskills.io-compatible skill surface.
 
 Version 1 supports Python 3.10 or newer on Linux and macOS.
 
@@ -11,7 +11,7 @@ python3 install.py user
 python3 install.py project /absolute/path/to/repo
 ```
 
-Both commands install the `default` profile on the Claude, Codex, and Agents surfaces. Repeat `--surface` with `claude`, `codex`, or `agents` to limit surfaces. Use `--dry-run` to preview and `--uninstall` to remove managed entries.
+Both commands install the `default` profile on the Claude Code, OpenAI Codex, and Agents surfaces. Repeat `--surface` with `claude`, `codex`, or `agents` to limit surfaces. Use `--dry-run` to preview and `--uninstall` to remove managed entries.
 
 Installs are idempotent, preflight all targets, refuse unmanaged conflicts, back up modified settings and text files as numbered `.bak` files, and track ownership in `.ai-skills-managed.json`.
 
@@ -39,7 +39,7 @@ Command and Git hooks are advisory defense-in-depth, not security boundaries. En
 
 ```bash
 python3 install.py project /absolute/path/to/repo \
-  --catalog /absolute/path/to/ai-skills-assembly/catalog.json \
+  --catalog /absolute/path/to/claude-codex-skills-assembly/catalog.json \
   --catalog /absolute/path/to/overlay/catalog.json \
   --profile default \
   --profile team-project
