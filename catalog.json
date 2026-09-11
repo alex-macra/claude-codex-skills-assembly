@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "name": "ai-skills-assembly",
   "displayName": "AI Skills Assembly",
-  "description": "AI Skills Assembly provides generic, cross-project skills and optional agent surfaces for supported agent CLIs.",
+  "description": "AI Skills Assembly provides reusable cross-project skills, deterministic activation, safety hooks, and installers for Claude Code and OpenAI Codex.",
   "surfaces": {
     "skills": [
       "agents",
