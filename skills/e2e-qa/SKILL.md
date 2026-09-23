@@ -97,6 +97,8 @@ export default defineConfig({
 
 ## Stack notes
 
+The stack is whatever the repository declares, not a fixed list. Before concluding "no E2E here," enumerate the project's own runnable journey targets - build-file targets (`Makefile`/`justfile`), `package.json` scripts, CI job names, README validation section - engine and CLI projects included; treat those targets as existing E2E and run them.
+
 ### Playwright (TypeScript)
 - `npx playwright codegen <url>` for initial scaffolding - but rewrite the generated locators to role-based ones.
 - `expect(locator).toHaveScreenshot()` for visual regression, with a generous `maxDiffPixelRatio`. Commit baselines per platform (Linux + macOS diverge).

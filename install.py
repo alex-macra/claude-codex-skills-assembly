@@ -646,6 +646,14 @@ def write_surface_state(actions: Actions, root: Path, state_data: dict) -> None:
     )
 
 
+def already_ignored(text: str) -> set[str]:
+    return {
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+
 def planned_gitignore(project: Path, uninstall: bool) -> tuple[Path, str, bool]:
     path = project / ".gitignore"
     require_target_parent(path, project)
@@ -677,7 +685,11 @@ def planned_gitignore(project: Path, uninstall: bool) -> tuple[Path, str, bool]:
     if uninstall:
         return path, without, start >= 0 and without != text
 
-    block = "\n".join((IGNORE_START, *IGNORE_ENTRIES, IGNORE_END)) + "\n"
+    missing = [entry for entry in IGNORE_ENTRIES if entry not in already_ignored(without)]
+    if not missing:
+        return path, without, without != text
+
+    block = "\n".join((IGNORE_START, *missing, IGNORE_END)) + "\n"
     prefix = without.rstrip("\n")
     desired = f"{prefix}\n\n{block}" if prefix else block
     return path, desired, desired != text

@@ -16,9 +16,11 @@ Type-check passing and green tests are **not** proof the change works. Behaviour
 
 ## Pick the launch path by project type
 
+Do not assume the launch command - the project always knows better than this table. Enumerate the runnable targets the project itself declares before choosing: build-file targets (`Makefile` / `justfile`), `package.json` scripts, declared CI job names, and the README run/validate section. A named journey/playtest/E2E/smoke target in that inventory outranks a generic launch, and its graphical variant outranks the headless one when one exists and the display environment allows it. Headless-only proof demonstrates absence of errors, not that the change is visible - say so in the evidence when you fall back to it.
+
 | Project type | How to launch | What to observe |
 |---|---|---|
-| **Godot** | `godot --headless --quit` (catches parse/script errors fast); `godot --path . <boot scene>` for interactive; `godot --headless --script tests/<x>_check.gd` for a domain path | Scene loads with no errors; the changed behaviour happens |
+| **Game engine (Godot, Unity, defold)** | The project's declared playtest/journey target first (e.g. a `make playtest-*` target, graphical or headless); `godot --headless --quit` to catch parse/script errors fast; the plain run command for interactive | The journey's scripted outcome passes and the changed behaviour happens, not just "scene loads with no errors" |
 | **Web frontend** | Start the dev server (`npm run dev` / framework equivalent), open the changed route | Golden path renders AND the error state; screenshot it |
 | **Backend / API** | Start the server, `curl` the changed endpoint with a real payload | `/health` returns 200; HTTP status + response shape match expectations |
 | **CLI / library** | Run the command/binary with real args (`--help` doubles as a trivial liveness check) | `stdout`/`stderr` AND exit code are correct |

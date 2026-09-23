@@ -73,4 +73,4 @@ PR work is not a delivery phase. After all required checks pass, invoke `fast-pr
 
 ## Handoff
 
-Report the task file, readiness outcome, changed files, commands and actual results, failures and fixes, reruns, discrepancies, blockers, and whether `fast-pr-workflow` was authorized. Keep it factual and concise.
+Report the task file, readiness outcome, changed files, commands and actual results, failures and fixes, reruns, discrepancies, blockers, whether `fast-pr-workflow` was authorized, and the full PR URL as a standalone Markdown link when one exists. Keep it factual and concise.
