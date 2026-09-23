@@ -140,6 +140,44 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse((project / ".claude" / "skills" / "skill-rules.json").exists())
         self.assertFalse((project / ".gitignore").exists())
 
+    def test_entries_already_ignored_are_not_repeated_in_the_block(self) -> None:
+        project = self.temp / "partly-ignored"
+        init_repo(project)
+        (project / ".gitignore").write_text(
+            "node_modules\n.codex/\nCLAUDE.md\nAGENTS.md\n", encoding="utf-8"
+        )
+
+        self.assertEqual(self.run_main(["project", str(project)])[0], 0)
+
+        gitignore = (project / ".gitignore").read_text()
+        self.assertEqual(gitignore.count(".codex/"), 1)
+        self.assertEqual(gitignore.count("CLAUDE.md"), 1)
+        self.assertEqual(gitignore.count("AGENTS.md"), 1)
+        self.assertIn(".claude/", gitignore)
+        self.assertIn(".agents/", gitignore)
+
+    def test_a_fully_ignoring_gitignore_is_left_alone(self) -> None:
+        project = self.temp / "fully-ignored"
+        init_repo(project)
+        original = "node_modules\n.agents/\n.claude/\n.codex/\nAGENTS.md\nCLAUDE.md\n"
+        (project / ".gitignore").write_text(original, encoding="utf-8")
+
+        self.assertEqual(self.run_main(["project", str(project)])[0], 0)
+
+        self.assertEqual((project / ".gitignore").read_text(), original)
+        self.assertNotIn(installer.IGNORE_START, (project / ".gitignore").read_text())
+        self.assertFalse((project / ".gitignore.bak").exists())
+
+    def test_a_commented_out_entry_does_not_count_as_ignored(self) -> None:
+        project = self.temp / "commented-ignore"
+        init_repo(project)
+        (project / ".gitignore").write_text("# CLAUDE.md\n", encoding="utf-8")
+
+        self.assertEqual(self.run_main(["project", str(project)])[0], 0)
+
+        block = (project / ".gitignore").read_text().split(installer.IGNORE_START)[1]
+        self.assertIn("CLAUDE.md", block)
+
     def test_unmanaged_file_is_refused(self) -> None:
         target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "a11y-audit"
         target.mkdir(parents=True)
