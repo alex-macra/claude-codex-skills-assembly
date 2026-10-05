@@ -11,12 +11,44 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Iterable
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILL_NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-LISTING_WARN_CHARS = 6_500
-LISTING_FAIL_CHARS = 7_400
+LISTING_WARN_CHARS = 2_500
+LISTING_FAIL_CHARS = 3_000
+DESCRIPTION_MAX_CHARS = 250
+AGENT_PRELOAD_MAX = 3
+CONTRACT_SKILLS = frozenset({"delivery-loop", "fast-pr-workflow"})
+MD_CAPS = {
+    "skill": (60, 5_000),
+    "contract-skill": (80, 7_000),
+    "reference": (80, 6_000),
+    "agent": (20, 2_000),
+    "global-rules": (40, 4_000),
+    "output-style": (20, 1_500),
+    "markdown": (80, None),
+}
+BARE_BASH_GRANTS = {"Bash", "Bash(*)"}
+DANGLING_NAME_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)*)`\s*(?i:skills?|agents?)(?![\w-])")
+BACKTICKED_NAME_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)*)`")
+RETIRED_NAMES = frozenset(
+    {
+        "a11y-audit",
+        "automation",
+        "code-comments",
+        "code-reuse",
+        "e2e-qa",
+        "qa",
+        "shipper",
+        "web-dev-backend",
+        "web-dev-frontend",
+    }
+)
+YAML_UNCERTAIN_STARTS = tuple(">|&*!%@`{?")
+YAML_COMMENT_RE = re.compile(r"(?:^|\s)#")
+DENYLIST_ENV = "AI_SKILLS_DENYLIST"
 REQUIRED_GLOBAL_RULES = {"claude", "codex"}
 REQUIRED_HOOKS = {"activation", "mergeGuard", "usage"}
 CATALOG_NAME = "ai-skills-assembly"
@@ -235,6 +267,8 @@ def skill_frontmatter(path: Path, findings: list[Finding]) -> dict[str, object] 
         if not separator or not key.strip():
             findings.append(finding("catalog", path, f"invalid frontmatter at line {line_number}"))
             continue
+        if key.strip() in fields:
+            findings.append(finding("catalog", path, f"repeated frontmatter key {key.strip()!r} at line {line_number}"))
         fields[key.strip()] = yaml_scalar(value)
 
     unknown = sorted(set(fields) - ALLOWED_FRONTMATTER)
@@ -243,33 +277,137 @@ def skill_frontmatter(path: Path, findings: list[Finding]) -> dict[str, object] 
     return fields
 
 
-def agent_declared_skills(path: Path) -> list[str]:
-    """Return the names under an agent's `skills:` frontmatter list, or [] if absent/unparsable.
-
-    Deliberately lenient about missing or malformed frontmatter - this only checks that any
-    declared skill names are real, not that agent files conform to a stricter shape.
-    """
+def frontmatter_block(path: Path) -> list[str] | None:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError):
-        return []
+        return None
     if not lines or lines[0] != "---":
-        return []
+        return None
     try:
         end = lines.index("---", 1)
     except ValueError:
-        return []
-    declared: list[str] = []
-    in_skills = False
-    for line in lines[1:end]:
-        if not line or not line[0].isspace():
-            in_skills = line.strip() == "skills:"
+        return None
+    return lines[1:end]
+
+
+def split_grants(value: str) -> list[str]:
+    items: list[str] = []
+    current: list[str] = []
+    depth = 0
+    for character in value:
+        if character == "(":
+            depth += 1
+        elif character == ")" and depth:
+            depth -= 1
+        if depth == 0 and (character == "," or character.isspace()):
+            if current:
+                items.append("".join(current))
+                current = []
             continue
-        if in_skills:
-            stripped = line.strip()
-            if stripped.startswith("- "):
-                declared.append(stripped[2:].strip())
-    return declared
+        current.append(character)
+    if current:
+        items.append("".join(current))
+    return [item.strip("\"'") for item in items if item.strip("\"'")]
+
+
+def frontmatter_key_line(block: list[str], key: str) -> int | None:
+    for index, line in enumerate(block):
+        if line[:1].isspace():
+            continue
+        name, separator, _ = line.partition(":")
+        if separator and name.strip() == key:
+            return index
+    return None
+
+
+def frontmatter_items(block: list[str], key: str) -> list[str]:
+    index = frontmatter_key_line(block, key)
+    if index is None:
+        return []
+    value = block[index].partition(":")[2].strip()
+    if value.startswith("[") and value.endswith("]"):
+        return split_grants(value[1:-1])
+    if value:
+        return split_grants(value)
+    items: list[str] = []
+    for line in block[index + 1 :]:
+        if line and not line[0].isspace():
+            break
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            items.append(stripped[2:].strip().strip("\"'"))
+    return items
+
+
+def strip_yaml_comment(value: str) -> str:
+    match = YAML_COMMENT_RE.search(value)
+    return value[: match.start()] if match else value
+
+
+def top_level_key(line: str) -> str | None:
+    if not line or line[0].isspace() or line.startswith(("#", "-")):
+        return None
+    name, separator, _ = line.partition(":")
+    return name.strip() if separator else None
+
+
+def allowed_tools(block: list[str]) -> tuple[list[str], str | None]:
+    indexes = [index for index, line in enumerate(block) if top_level_key(line) == "allowed-tools"]
+    if not indexes:
+        return [], None
+    if len(indexes) > 1:
+        return [], "allowed-tools is repeated"
+    value = strip_yaml_comment(block[indexes[0]].partition(":")[2]).strip()
+    continuation: list[str] = []
+    for line in block[indexes[0] + 1 :]:
+        stripped = strip_yaml_comment(line).strip()
+        if not stripped:
+            continue
+        if not line[0].isspace() and not line.startswith("-"):
+            break
+        continuation.append(stripped)
+    if "\\" in value + "".join(continuation) and "\"" in value + "".join(continuation):
+        return [], "allowed-tools has an escaped double-quoted value"
+    if value:
+        if continuation:
+            return [], "allowed-tools spans several lines"
+        if value.startswith("["):
+            inner = value[1:-1]
+            if not value.endswith("]") or "[" in inner or "]" in inner:
+                return [], "allowed-tools has a flow list that does not close on its line"
+            return split_grants(inner), None
+        if value.startswith(YAML_UNCERTAIN_STARTS):
+            return [], f"allowed-tools starts with {value[0]!r}, which this check cannot read"
+        return split_grants(value), None
+    items: list[str] = []
+    for entry in continuation:
+        item = entry[2:].strip() if entry.startswith("- ") else ""
+        if not item or item.startswith(YAML_UNCERTAIN_STARTS + ("[", "-")):
+            return [], "allowed-tools has a line this check cannot read"
+        items.append(item.strip("\"'"))
+    return items, None
+
+
+def frontmatter_text(block: list[str], key: str) -> str | None:
+    index = frontmatter_key_line(block, key)
+    if index is None:
+        return None
+    value = block[index].partition(":")[2].strip()
+    if value not in {">", ">-", "|", "|-"}:
+        scalar = yaml_scalar(value)
+        return scalar if isinstance(scalar, str) else None
+    folded: list[str] = []
+    for line in block[index + 1 :]:
+        if line and not line[0].isspace():
+            break
+        folded.append(line.strip())
+    return " ".join(part for part in folded if part)
+
+
+def agent_declared_skills(path: Path) -> list[str]:
+    block = frontmatter_block(path)
+    return frontmatter_items(block, "skills") if block is not None else []
 
 
 def check_python(root: Path, files: list[Path]) -> list[Finding]:
@@ -536,8 +674,14 @@ def validate_catalog(root: Path) -> tuple[list[Finding], dict[str, str], set[str
             if fields.get("name") != name:
                 findings.append(finding("catalog", skill_md.relative_to(root), "frontmatter name must match catalog key"))
             description = fields.get("description")
-            if not isinstance(description, str) or not 1 <= len(description) <= 1_024:
-                findings.append(finding("catalog", skill_md.relative_to(root), "description must be 1-1024 characters"))
+            if not isinstance(description, str) or not 1 <= len(description) <= DESCRIPTION_MAX_CHARS:
+                findings.append(
+                    finding(
+                        "catalog",
+                        skill_md.relative_to(root),
+                        f"description must be 1-{DESCRIPTION_MAX_CHARS} characters",
+                    )
+                )
             else:
                 descriptions[name] = description
                 declared = entry.get("description")
@@ -572,14 +716,33 @@ def validate_catalog(root: Path) -> tuple[list[Finding], dict[str, str], set[str
         agent_path, error = safe_catalog_path(root, entry.get("path") if isinstance(entry, dict) else None)
         if error or agent_path is None:
             continue
+        relative_agent = agent_path.relative_to(root)
         declared = agent_declared_skills(agent_path)
         unknown = sorted(set(declared) - catalog_names)
         if unknown:
             findings.append(
                 finding(
                     "catalog",
-                    agent_path.relative_to(root),
+                    relative_agent,
                     "agent skills reference unknown catalog skills: " + ", ".join(unknown),
+                )
+            )
+        if len(declared) > AGENT_PRELOAD_MAX:
+            findings.append(
+                finding(
+                    "catalog",
+                    relative_agent,
+                    f"agent preloads {len(declared)} skills; maximum is {AGENT_PRELOAD_MAX}",
+                )
+            )
+        block = frontmatter_block(agent_path)
+        agent_description = frontmatter_text(block, "description") if block is not None else None
+        if not agent_description or len(agent_description) > DESCRIPTION_MAX_CHARS:
+            findings.append(
+                finding(
+                    "catalog",
+                    relative_agent,
+                    f"agent description must be 1-{DESCRIPTION_MAX_CHARS} characters",
                 )
             )
 
@@ -814,16 +977,16 @@ def check_template_parity(root: Path) -> list[Finding]:
     return []
 
 
-def check_listing(descriptions: dict[str, str], profile: set[str]) -> list[Finding]:
+def check_listing(descriptions: dict[str, str], profile: set[str], label: str = "default profile") -> list[Finding]:
     total = sum(len(name) + len(descriptions.get(name, "")) for name in profile)
     if total > LISTING_FAIL_CHARS:
-        return [finding("listing", "catalog.json", f"default profile costs {total} characters; maximum is {LISTING_FAIL_CHARS}")]
+        return [finding("listing", "catalog.json", f"{label} costs {total} characters; maximum is {LISTING_FAIL_CHARS}")]
     if total > LISTING_WARN_CHARS:
         return [
             finding(
                 "listing",
                 "catalog.json",
-                f"default profile costs {total} characters; warning threshold is {LISTING_WARN_CHARS}",
+                f"{label} costs {total} characters; warning threshold is {LISTING_WARN_CHARS}",
                 severity="warning",
             )
         ]
@@ -916,7 +1079,276 @@ def check_secrets(root: Path, entries: list[Path], files: list[Path]) -> list[Fi
     return findings
 
 
-def validate(root: Path) -> list[Finding]:
+@dataclass(frozen=True)
+class CapRow:
+    path: str
+    lines: int
+    size: int
+    max_lines: int
+    max_bytes: int | None
+
+    @property
+    def within(self) -> bool:
+        return self.lines <= self.max_lines and (self.max_bytes is None or self.size <= self.max_bytes)
+
+
+def md_cap_kind(relative: PurePosixPath, contract_skills: frozenset[str] = CONTRACT_SKILLS) -> str | None:
+    if relative.suffix != ".md":
+        return None
+    parts = relative.parts
+    if len(parts) == 3 and parts[0] == "skills" and parts[2] == "SKILL.md":
+        return "contract-skill" if parts[1] in contract_skills else "skill"
+    if len(parts) == 4 and parts[0] == "skills" and parts[2] == "references":
+        return "reference"
+    if len(parts) == 2 and parts[0] == "agents":
+        return "agent"
+    if relative.as_posix() in {"templates/CLAUDE.md", "templates/AGENTS.md"}:
+        return "global-rules"
+    if len(parts) == 3 and parts[:2] == ("templates", "output-styles"):
+        return "output-style"
+    return "markdown"
+
+
+def nested_reference(relative: PurePosixPath) -> bool:
+    parts = relative.parts
+    return len(parts) > 4 and parts[0] == "skills" and parts[2] == "references"
+
+
+def cap_row(path: Path, relative: PurePosixPath, kind: str) -> CapRow | None:
+    try:
+        data = path.read_bytes()
+        text = data.decode("utf-8")
+    except (OSError, UnicodeError):
+        return None
+    max_lines, max_bytes = MD_CAPS[kind]
+    return CapRow(relative.as_posix(), len(text.splitlines()), len(data), max_lines, max_bytes)
+
+
+def md_cap_rows(root: Path, files: list[Path]) -> list[CapRow]:
+    rows: list[CapRow] = []
+    for path in files:
+        relative = PurePosixPath(path.relative_to(root).as_posix())
+        kind = md_cap_kind(relative)
+        if kind is None:
+            continue
+        row = cap_row(path, relative, kind)
+        if row is not None:
+            rows.append(row)
+    return rows
+
+
+def cap_message(row: CapRow) -> str:
+    cap = f"{row.max_lines} lines" + (f" and {row.max_bytes} bytes" if row.max_bytes is not None else "")
+    return f"{row.lines} lines and {row.size} bytes exceed the cap of {cap}"
+
+
+def catalog_tree_symlinks(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for top in ("skills", "agents"):
+        base = root / top
+        if base.is_symlink():
+            found.append(base)
+            continue
+        for current, directories, filenames in os.walk(base):
+            directories.sort()
+            found.extend(
+                candidate
+                for candidate in (Path(current) / name for name in directories + sorted(filenames))
+                if candidate.is_symlink()
+            )
+    return found
+
+
+def check_md_caps(root: Path, entries: list[Path], files: list[Path]) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in entries:
+        relative = PurePosixPath(path.relative_to(root).as_posix())
+        if path.is_file() and nested_reference(relative):
+            findings.append(finding("caps", relative, "references must be one level deep"))
+    for path in catalog_tree_symlinks(root):
+        findings.append(
+            finding("caps", path.relative_to(root), "must be a regular file or real directory, not a symlink")
+        )
+    for row in md_cap_rows(root, files):
+        if not row.within:
+            findings.append(finding("caps", row.path, cap_message(row)))
+    return findings
+
+
+def bash_grant_problems(skill_md: Path) -> list[str]:
+    block = frontmatter_block(skill_md)
+    if block is None:
+        return []
+    grants, problem = allowed_tools(block)
+    if problem is not None:
+        return [problem]
+    return [
+        f"allowed-tools grants unscoped {grant}"
+        for grant in grants
+        if "".join(grant.split()) in BARE_BASH_GRANTS
+    ]
+
+
+def check_no_bare_bash(root: Path, files: list[Path]) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in files:
+        parts = path.relative_to(root).parts
+        if len(parts) != 3 or parts[0] != "skills" or parts[2] != "SKILL.md":
+            continue
+        for problem in bash_grant_problems(path):
+            findings.append(finding("permissions", path.relative_to(root), problem))
+    return findings
+
+
+def declared_names(root: Path) -> set[str]:
+    try:
+        data = json.loads((root / "catalog.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return set()
+    names: set[str] = set()
+    for section in ("skills", "agents"):
+        values = data.get(section) if isinstance(data, dict) else None
+        if isinstance(values, dict):
+            names.update(name for name in values if isinstance(name, str))
+    return names
+
+
+def dangling_names(text: str, known: set[str]) -> list[tuple[int, str]]:
+    found = {
+        (text.count("\n", 0, match.start()) + 1, match.group(1))
+        for match in DANGLING_NAME_RE.finditer(text)
+        if match.group(1) not in known
+    }
+    found.update(
+        (text.count("\n", 0, match.start()) + 1, match.group(1))
+        for match in BACKTICKED_NAME_RE.finditer(text)
+        if match.group(1) in RETIRED_NAMES and match.group(1) not in known
+    )
+    return sorted(found)
+
+
+def names_prose(relative: PurePosixPath) -> bool:
+    if relative.suffix != ".md":
+        return False
+    if relative.parts[0] in {"skills", "agents", "templates"}:
+        return True
+    return relative.as_posix() in {"README.md", "CONTRIBUTING.md"}
+
+
+def check_dangling_names(root: Path, files: list[Path]) -> list[Finding]:
+    known = declared_names(root)
+    findings: list[Finding] = []
+    for path in files:
+        relative = PurePosixPath(path.relative_to(root).as_posix())
+        if not names_prose(relative):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        for line_number, token in dangling_names(text, known):
+            findings.append(
+                finding("names", relative, f"line {line_number} names unknown skill or agent {token!r}")
+            )
+    return findings
+
+
+def load_denylist(root: Path, path: Path) -> tuple[list[tuple[int, str]], list[Finding]]:
+    try:
+        resolved = path.expanduser().resolve(strict=True)
+        text = resolved.read_text(encoding="utf-8")
+    except (OSError, RuntimeError, UnicodeError):
+        return [], [finding("denylist", "denylist", "denylist file cannot be read")]
+    if is_within(resolved, root.resolve()):
+        return [], [finding("denylist", "denylist", "denylist file must live outside the repository")]
+    terms = [
+        (number, line.strip().lower())
+        for number, line in enumerate(text.splitlines(), start=1)
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    return terms, []
+
+
+def denylist_hits(text: str, terms: list[tuple[int, str]]) -> str:
+    lowered = text.lower()
+    return ", ".join(str(number) for number, term in terms if term in lowered)
+
+
+def check_denylist(root: Path, entries: list[Path], files: list[Path], denylist: Path) -> list[Finding]:
+    terms, findings = load_denylist(root, denylist)
+    if not terms:
+        return findings
+    for path in entries:
+        relative = path.relative_to(root)
+        hits = denylist_hits(relative.as_posix(), terms)
+        if hits:
+            findings.append(finding("denylist", relative, f"denylisted term in path (entry {hits})"))
+    for path in files:
+        relative = path.relative_to(root)
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            hits = denylist_hits(line, terms)
+            if hits:
+                findings.append(
+                    finding("denylist", relative, f"denylisted term at line {line_number} (entry {hits})")
+                )
+    return findings
+
+
+def check_extra_skill(
+    path: Path,
+    reserved: Iterable[str] = (),
+    catalog_roots: Iterable[Path] = (),
+) -> list[str]:
+    name = path.name
+    if path.is_symlink():
+        return [f"{name}: skill directory must not be a symlink"]
+    if not path.is_dir():
+        return [f"{name}: skill path must be a directory"]
+    resolved = path.resolve()
+    problems: list[str] = []
+    if not SKILL_NAME_RE.fullmatch(name):
+        problems.append(f"{name}: directory name must be lowercase and hyphenated")
+    if name in set(reserved):
+        problems.append(f"{name}: name collides with a catalog skill")
+    if any(is_within(resolved, Path(root).resolve()) for root in catalog_roots):
+        problems.append(f"{name}: skill lives inside a catalog root")
+    skill_md = path / "SKILL.md"
+    if skill_md.is_symlink() or not skill_md.is_file():
+        return [*problems, f"{name}: SKILL.md must be a regular file"]
+    findings: list[Finding] = []
+    fields = skill_frontmatter(skill_md, findings)
+    problems.extend(f"{name}: {item.message}" for item in findings)
+    if fields is not None:
+        if fields.get("name") != name:
+            problems.append(f"{name}: frontmatter name must match the directory name")
+        description = fields.get("description")
+        if not isinstance(description, str) or not 1 <= len(description) <= DESCRIPTION_MAX_CHARS:
+            problems.append(f"{name}: description must be 1-{DESCRIPTION_MAX_CHARS} characters")
+    problems.extend(f"{name}: {problem}" for problem in bash_grant_problems(skill_md))
+    for current, directories, filenames in os.walk(path):
+        directories.sort()
+        for item in directories + sorted(filenames):
+            candidate = Path(current) / item
+            inner = PurePosixPath("skills", name, *candidate.relative_to(path).parts)
+            if candidate.is_symlink():
+                problems.append(f"{name}: {inner.as_posix()} is a symlink; extra skills hold regular files only")
+                continue
+            if candidate.is_file() and nested_reference(inner):
+                problems.append(f"{name}: {inner.as_posix()} nests references more than one level deep")
+            kind = md_cap_kind(inner, frozenset())
+            if kind is None or not candidate.is_file():
+                continue
+            row = cap_row(candidate, inner, kind)
+            if row is not None and not row.within:
+                problems.append(f"{name}: {row.path} {cap_message(row)}")
+    return problems
+
+
+def validate(root: Path, denylist: Path | None = None) -> list[Finding]:
     root = root.resolve()
     entries = repo_entries(root)
     files = regular_files(root, entries)
@@ -928,21 +1360,34 @@ def validate(root: Path) -> list[Finding]:
     findings.extend(validate_routing(root, set(descriptions), registry_path, fixtures_path))
     findings.extend(check_listing(descriptions, profile))
     findings.extend(check_template_parity(root))
+    findings.extend(check_md_caps(root, entries, files))
+    findings.extend(check_no_bare_bash(root, files))
+    findings.extend(check_dangling_names(root, files))
     findings.extend(check_plain_hyphens(root, entries, files))
     findings.extend(check_privacy(root, entries, files))
     findings.extend(check_secrets(root, entries, files))
+    if denylist is not None:
+        findings.extend(check_denylist(root, entries, files, denylist))
     return sorted(set(findings))
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate the AI Skills Assembly public repository.")
     parser.add_argument("--root", type=Path, default=REPO_ROOT, help="repository root")
+    parser.add_argument(
+        "--denylist",
+        type=Path,
+        help=f"uncommitted file of private terms, one per line (default: ${DENYLIST_ENV})",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv or sys.argv[1:])
-    findings = validate(args.root)
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    denylist = args.denylist
+    if denylist is None and os.environ.get(DENYLIST_ENV, "").strip():
+        denylist = Path(os.environ[DENYLIST_ENV].strip())
+    findings = validate(args.root, denylist)
     for item in findings:
         print(f"{item.severity.upper()} [{item.check}] {item.path}: {item.message}")
     errors = sum(item.severity == "error" for item in findings)

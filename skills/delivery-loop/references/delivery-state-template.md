@@ -15,6 +15,11 @@
 - Failures:
 - Fixes:
 - Reruns:
+- Review verdicts:
+- Final smoke:
+- Pull request:
+- Tracker lines:
+- Inbox entries applied:
 - Browser policy:
 - Browser lease:
 - Blockers:

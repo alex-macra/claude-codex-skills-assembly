@@ -1,79 +1,78 @@
 # Delivery checklist
 
-Use this checklist to execute one approved Markdown task packet. The four rows below are the complete delivery phase sequence.
+The eight rows below are the complete delivery phase sequence. Keep the evidence block current; it is the handoff.
 
 ## Evidence block
 
 ```markdown
 **Delivery Status**
-- Task file:
-- Phase:
-- Readiness outcome:
+- Task file and Task ID:
+- Phase and readiness outcome:
 - Changed files:
 - Commands and results:
-- Failures:
-- Fixes:
-- Reruns:
-- Discrepancies:
-- Blockers:
+- Failures, fixes, and reruns:
+- Review verdicts:
+- Final smoke:
+- Branch and commit:
+- Pull request:
+- Tracker lines and inbox entries applied:
+- Discrepancies and blockers:
 - Next gate:
 ```
 
 ## Phase contract
 
-| Phase | Required input | Exit evidence | Stop condition | Next gate |
-| --- | --- | --- | --- | --- |
-| Validate task Markdown | One approved task file and the target checkout. | Repository facts verified and one outcome recorded: `READY`, `BLOCKED_BY_SPEC`, or `NO_CHANGE_NEEDED`. | `BLOCKED_BY_SPEC`, ambiguous authority, or missing prerequisite. | Implement when `READY`; verify without edits when `NO_CHANGE_NEEDED`. |
-| Implement | A validated packet with no unresolved design choice. | Scoped diff satisfies the required change while preserving invariants and non-goals. | New scope, dependency, schema work, credentials, or unsettled decision is required. | Test and build. |
-| Test and build | Current diff and the packet's verification contract. | Exact focused and broader commands run; actual results and failure classes recorded. | Required environment or access is unavailable. | Fix and retest, or handoff when green. |
-| Fix and retest | An in-scope product or test failure with a reproducer. | Fix recorded; focused proof and affected broader checks rerun. | Two similar repairs fail, three cycles do not converge, or the fix leaves packet scope. | Test and build until green, then handoff. |
+| Phase | Skill when relevant | Exit evidence | Stop condition |
+| --- | --- | --- | --- |
+| Validate task Markdown | `task-research` | Facts verified at the pinned base; one readiness outcome. | Conflicting claim, ambiguous authority, or missing prerequisite. |
+| Implement | `web-dev` | Scoped diff meets the change and keeps invariants and non-goals. | New scope, dependency, schema work, credentials, or an open decision. |
+| Test and build | `qa-automation` | Focused, then broader commands run; results and failure classes recorded. | Required environment or access is unavailable. |
+| Fix and retest | `qa-automation` | Each fix proven by the smallest check; affected broader checks rerun. | A loop bound is hit or the fix leaves scope. |
+| Architecture and adversarial review | `architect-review`, `adversarial-review`, `security-review` | Architecture pass, then falsification of the exact diff; findings resolved or accepted. | A finding needs new scope or an owner decision. |
+| Final smoke | `see-it-live` | Declared critical path passes on the reviewed candidate after the last fix. | Required runtime evidence is unavailable or fails. |
+| Commit, push, and open PR | `fast-pr-workflow` | One focused commit, matching remote topic branch, one open canonical pull request. | Exclusion, missing credentials, protected destination, or ambiguous scope. |
+| Verify remote handoff | `fast-pr-workflow` | Repository, base, topic, open state, and full local, remote, and PR head IDs match. | Missing, duplicate, closed, stale, or mismatched pull request. |
 
 ## 1. Validate task Markdown
 
-- Read repository instructions and the entire task file.
-- Resolve the repository, branch, base commit or ref, prerequisite task outputs, and allowed scope.
-- Record full commit IDs, upstream refs, worktree overlap, and which evidence is committed versus local or ignored.
-- Inspect immutable evidence by object ID. Assert mutable refs resolve to their expected full commits before using them, and never substitute checkout `HEAD` for the packet base.
-- Verify every referenced existing file, symbol, behavior, dependency, pattern, and command.
-- Verify one writable repository and delivery history, exact read and write sets, predecessor artifact identities, and a collision-safe retry or recovery path.
-- Classify each command as current-state or post-change proof; run safe preflight and record its expected and actual result.
-- Bind tools, locks, CI-job setup, and any credential to explicit provenance and minimum scope. Reject unprovenanced ambient installs and implicit cross-job state.
-- Confirm proposed files and symbols are labeled as proposed.
-- Require every mandatory top-level section or equivalent embedded-ledger field: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, and Handoff. A field that truly does not apply remains present and says `Not applicable - <reason>`.
-- Treat canonical tracker status as informational. Only the packet's fixed readiness outcome controls delivery.
-- Record `READY` when the task is decision-complete and has a clean or isolated execution state, `BLOCKED_BY_SPEC` for material conflicts or missing decisions, or `NO_CHANGE_NEEDED` when acceptance is already satisfied from a pinned clean or isolated state.
-- Stop before editing on `BLOCKED_BY_SPEC`. Do not silently replan the task.
-- On `NO_CHANGE_NEEDED`, skip code edits and prove every acceptance case. Internal-only proof is insufficient when acceptance requires another repository, runtime, browser, artifact, or served response.
+- Read repository instructions and the whole packet. Record full `HEAD`, branch, upstream, worktree status, and which evidence is committed versus dirty or ignored.
+- Inspect evidence by object ID at the pinned base commit or ref; assert a mutable ref's full ID first and never let checkout `HEAD` stand in for the base.
+- Verify referenced files, symbols, behaviors, dependencies, prerequisite output identities and digests, and commands; proposed work must be labeled as proposed.
+- Confirm one writable repository and delivery history, exact read and write sets, and a collision-safe retry path. Classify each command as current-state or post-change proof; run safe preflight.
+- Bind tools and credentials to explicit provenance and least privilege; capability is not authorization. Reject unprovenanced ambient installs and implicit cross-job state.
+- Require every section: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, Handoff; one that does not apply says `Not applicable - <reason>`. Run a validator named in Verify; structural green never replaces evidence checks.
+- Only the packet's readiness controls the loop; tracker status is informational. `READY` needs a clean or isolated state. Stop before editing on `BLOCKED_BY_SPEC`. On `NO_CHANGE_NEEDED`, prove every acceptance case end to end and stop without an empty commit, push, or PR. A tracked task runs `claim` after `READY` unless its conductor claimed before dispatch.
 
 ## 2. Implement
 
-- Follow the validated contract and existing repository patterns.
-- Preserve unrelated changes and declared invariants, interfaces, errors, compatibility, security, and concurrency behavior.
-- Do not weaken acceptance criteria or tests to get green.
-- Return to validation if the starting evidence changes materially.
+- Follow the validated contract and existing patterns; read each whole target file before editing. Preserve unrelated changes and declared interfaces, errors, compatibility, security, and concurrency behavior.
+- Do not weaken acceptance criteria or tests to get green. Return to validation if the starting evidence changes materially.
 
 ## 3. Test and build
 
-- Run the cheapest focused command first.
-- Run broader tests, type checks, linters, and builds named by the packet when relevant.
-- Capture commands and actual output, including pass counts, failures, timings, and skipped checks when available.
-- Classify each failure as product, test, environment, or preexisting.
-- For browser work, obey repository browser policy and use `scripts/browser-suite-lease.py` when the shared local lease is required.
+- Run the cheapest focused command first, then the broader tests, type checks, linters, and builds the packet names.
+- Capture commands and actual output with counts and skipped checks. Classify each failure as product, test, environment, or preexisting.
+- Browser work obeys repository browser policy and uses `scripts/browser-suite-lease.py` when the shared lease is required. A tracked task checkpoints this gate as `verify`.
 
 ## 4. Fix and retest
 
-- Fix only in-scope product and test defects.
-- Rerun the smallest proof after each fix.
-- Rerun affected broader commands after focused checks pass.
-- Stop after two materially similar failed repairs or three repair cycles without convergence.
-- On stop, record the reproducer, observed failure, attempted fixes, and unresolved question.
+- Fix only in-scope defects; rerun the smallest proof, then affected broader commands. Stop after two materially similar failed repairs or three repair cycles without convergence, with the reproducer, failure, attempts, and open question.
 
-## Optional state
+## 5. Architecture and adversarial review
 
-For work that will cross sessions, use `scripts/delivery-state.py init <task> --repository .` and update the generated record after phases and material failures. Run `verify` before resuming. Do not hand-create or reimplement the state file. Optional state records the four-phase evidence; it does not add a workflow phase or grant authority.
+- Architecture review before adversarial falsification; add security, accessibility, reuse, and comment checks when the surface needs them.
+- A real finding returns to implementation and repeats every later phase.
 
-## Optional PR handoff
+## 6. Final smoke
 
-- PR work starts only after the four-phase loop is green.
-- Invoke `fast-pr-workflow` only when the current request authorizes the relevant Git or pull-request actions.
-- Without that authorization, report a PR-ready local handoff and stop.
+- Run the repository-declared critical journey on the final reviewed candidate and record the exact command or served path and result; never substitute a narrower internal check.
+
+## 7. Commit, push, and open PR
+
+- An explicit delivery-loop request authorizes this topic-branch bundle unless the user excludes an action. Commit only the validated diff, push the non-protected branch, and create or update one canonical pull request carrying validation, review, smoke, risks, and one `Task: <ID>` line per tracked task.
+- Enter a shipping freeze after the push; merge and release stay separate gates.
+
+## 8. Verify remote handoff
+
+- Require exactly one open pull request for the intended repository, base, and topic branch, with matching full local `HEAD`, remote branch head, and PR head IDs; any mismatch fails the phase.
+- A tracked task runs `review` with the exact URL. Report the URL on its own line and stop before merge.

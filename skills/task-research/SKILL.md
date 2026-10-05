@@ -1,10 +1,10 @@
 ---
 name: task-research
-description: "Research a task before building: codebase prior art first, then docs and web, separating facts from assumptions, ending in a short findings brief that feeds a plan or ticket. Use for research, investigate, look into, find out how, what's the best way, compare approaches, spikes, or feasibility checks."
+description: "Research a task before building: codebase prior art first, then docs and web, facts separated from assumptions, ending in a short findings brief. Use for research, investigate, find out how, compare approaches, spikes, or feasibility."
 license: MIT
 metadata:
   display-name: "Task Research"
-  version: "1.1"
+  version: "2.0"
   platforms: "claude-code codex"
   tags: "research planning discovery"
 ---
@@ -26,8 +26,7 @@ Most "how do I build X" questions are already answered inside this repo.
 
 - **Triage sources by trust:** official docs and the library's own repo/issues > maintained examples > recent blog posts > forum answers. A 2019 Stack Overflow answer about a fast-moving library is probably wrong now.
 - **Check version and date.** Pin every claim to the version it applies to. APIs drift; "the top Google result" is often two majors behind.
-- **Corroborate load-bearing claims.** If a decision hinges on it, find a second independent source. For a deep, fully-cited investigation, hand off to the `deep-research` skill instead.
-
+- **Corroborate load-bearing claims.** If a decision hinges on it, find a second independent source.
 ## Separate facts from assumptions
 
 - Label every statement: **fact** (verified, with a source/location) vs **assumption** (plausible, unverified).
@@ -56,5 +55,4 @@ This brief is an *input* to a ticket or the Plan flow - it doesn't propose diffs
 ## What this skill is *not*
 
 - Not implementation - it precedes it.
-- Not a full cited report - that's `deep-research`.
 - Not architecture evaluation of existing code - that's `architect-review`.

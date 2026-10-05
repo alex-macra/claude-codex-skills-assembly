@@ -1,10 +1,10 @@
 ---
 name: adversarial-review
-description: "Independent second-pass review that tries to break the change: invariants, edge cases, error paths, concurrency, ending in a concrete failing input and a verdict. Use for an adversarial review, red team pass, second opinion, try to break this, or poke holes. Deep security passes belong to security-review."
+description: "Independent second-pass review that tries to break the change: invariants, edge cases, error paths, concurrency; ends in a failing input and a verdict. Use for an adversarial review, red team pass, or poke holes."
 license: MIT
 metadata:
   display-name: "Adversarial Review"
-  version: "1.1"
+  version: "2.0"
   platforms: "claude-code codex"
   tags: "review red-team quality verification"
 ---

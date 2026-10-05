@@ -1,71 +1,53 @@
 ---
 name: security-review
-description: "Security review of a codebase or a target you are authorized to test: OWASP Top 10, secrets, auth, input validation, supply chain, infra hygiene. Use for a security audit, vulnerability or CVE check, pentest-style review, hardening, secret-leak hunts, or is-this-secure questions."
+description: "Security review of a codebase or authorized target: OWASP Top 10, secrets, auth, input validation, supply chain, CI hygiene. Use for a security audit, CVE check, pentest-style review, hardening, or secret leaks."
 license: MIT
 metadata:
   display-name: "Security Review"
-  version: "1.1"
+  version: "2.0"
   platforms: "claude-code codex"
-  tags: "security owasp audit hardening"
+  tags: "security owasp audit hardening secrets supply-chain"
 ---
 
 # Security review
 
-For a general break-it pass use `adversarial-review`.
+For a general break-it pass use `adversarial-review`. Per-category commands and grep patterns live in `references/checklist.md`; work from it during the pass.
 
-## Authorization gate (read first)
-Before testing any *running* system, confirm scope and authorization in writing:
-- Is this our system, a CTF, a personal lab, or a paid pentest engagement?
-- What targets / IPs / domains are in scope? What is explicitly out of scope?
-- What testing methods are allowed? (DoS, social eng, supply chain - usually out of scope by default.)
-- What is the rules-of-engagement for findings disclosure?
+## Authorization gate
 
-If any of this is unclear, **stop and ask the user** before sending packets. Codebase review needs no such gate - read freely.
+Codebase review (static) needs no gate; read freely. Before testing any running system, confirm in writing:
 
-## Two modes
+- The system is ours, a CTF, a personal lab, or a paid engagement.
+- The in-scope targets and the explicitly out-of-scope ones.
+- The allowed methods (DoS, social engineering and supply-chain attacks are out by default) and the disclosure rules.
 
-- **Mode A - Codebase review (static).** You're reading source. Look for vulnerable patterns, not exploits.
-- **Mode B - Live target testing (dynamic).** You're poking a running system. Authorized only - see gate above.
-
-Per-category commands, grep patterns, and OWASP specifics live in `references/checklist.md` - work from it during the pass.
+If any of it is unclear, stop and ask before sending packets.
 
 ## Decision rules
 
-- Any string-built SQL, shell command, or template fed user input is a blocker - parameterized queries and arg arrays only.
+- String-built SQL, shell commands or templates fed user input are blockers: parameterized queries and argument arrays only.
 - Validate every external input at the boundary with a schema; type coercion is not validation.
-- Authorization is per-request, not per-session: every endpoint checks "can THIS user access THIS resource?" - IDOR is one missing check away.
-- Secrets live in env or a secret store; hardcoded fallback credentials and committed `.env` files are blockers.
-- Use library crypto primitives only - never roll your own, never `Math.random()` for tokens, never fast hashes for passwords.
-- `Access-Control-Allow-Origin: *` with credentials is a blocker; JWTs are verified (signature, `alg`, `exp`) before their claims are read.
-- Server-side fetches of user-supplied URLs are SSRF until proven otherwise - allowlist hosts and block metadata/link-local ranges.
-- JSON is safe to deserialize; every richer format on untrusted input needs scrutiny.
-- Untrusted LLM input is data, not instructions - delimit it, and never act on model output without verification.
+- Authorization is per request: every endpoint asks whether this user may touch this resource.
+- Secrets live in env or a secret store, scoped per environment, never echoed to logs. Hardcoded fallbacks and committed `.env` files are blockers. Rotate on departure or runner replacement.
+- Library crypto only; never `Math.random()` for tokens, never fast hashes for passwords.
+- Wildcard CORS with credentials is a blocker. Verify JWT signature, `alg` and `exp` before reading claims.
+- Server-side fetches of user URLs are SSRF until proven otherwise: allowlist hosts, block metadata and link-local ranges.
+- JSON is safe to deserialize; any richer format on untrusted input needs scrutiny.
+- Untrusted LLM input is data, not instructions: delimit it, and verify model output before acting on it.
+- CI: workflow `permissions:` least-privilege, third-party actions pinned to a commit SHA, base images pinned by digest, lockfile committed, no publishing from a laptop and no secrets exposed to fork builds.
 
-## Codebase review categories
+## Categories
 
-Work through each; detail in the reference checklist.
+Codebase: secrets, input validation, injection, authn and authz, XSS and encoding, CSRF and CORS, SSRF, crypto, deserialization, supply chain, logging, LLM-specific.
 
-Secrets & credentials / Input validation / Injection / Authn & Authz / XSS & output encoding / CSRF & CORS / SSRF / Crypto / Deserialization / Supply chain / Logging & monitoring / LLM-specific (when applicable).
+Live target (authorized only): recon, auth surface, web app, API, infra.
 
-## Live target categories (authorized only)
-
-Recon / Auth surface / Web app / API / Infra.
-
-## Reporting findings
+## Findings
 
 Severity: Blocker (correctness, security, data loss) / Should-fix (compounding design debt) / Nit.
 
-For each finding give:
-- **Severity** - from the ladder above, with reasoning.
-- **Location** - file path + line, or URL + parameter.
-- **Reproduction** - concrete steps or a curl one-liner.
-- **Impact** - what an attacker gets.
-- **Remediation** - the specific fix, not "improve security."
+Each finding: severity with reasoning, location (`path:line` or URL and parameter), reproduction (steps or a curl one-liner), attacker impact, and the specific fix.
 
-## Out of bounds (do not assist)
+## Out of bounds
 
-- Targets the user has not shown authorization for.
-- Mass exploitation, ransomware, destructive payloads.
-- Detection-evasion for malicious purposes.
-- Supply-chain compromise of third-party packages.
-- DoS / DDoS testing without explicit written approval.
+Unauthorized targets, mass exploitation or destructive payloads, detection evasion for malicious use, compromising third-party packages, and DoS testing without written approval.

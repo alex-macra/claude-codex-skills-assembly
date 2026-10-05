@@ -10,40 +10,27 @@
       "codex"
     ],
     "agents": [
-      "claude",
-      "codex"
+      "claude"
     ],
     "outputStyles": [
       "claude"
     ]
   },
   "skills": {
-    "a11y-audit": {
-      "path": "skills/a11y-audit"
-    },
     "adversarial-review": {
       "path": "skills/adversarial-review"
     },
     "architect-review": {
       "path": "skills/architect-review"
     },
-    "automation": {
-      "path": "skills/automation"
-    },
-    "code-comments": {
-      "path": "skills/code-comments"
-    },
-    "code-reuse": {
-      "path": "skills/code-reuse"
-    },
     "delivery-loop": {
       "path": "skills/delivery-loop"
     },
-    "e2e-qa": {
-      "path": "skills/e2e-qa"
-    },
     "fast-pr-workflow": {
       "path": "skills/fast-pr-workflow"
+    },
+    "orchestrator": {
+      "path": "skills/orchestrator"
     },
     "qa-automation": {
       "path": "skills/qa-automation"
@@ -57,22 +44,16 @@
     "task-research": {
       "path": "skills/task-research"
     },
-    "web-dev-backend": {
-      "path": "skills/web-dev-backend"
-    },
-    "web-dev-frontend": {
-      "path": "skills/web-dev-frontend"
+    "web-dev": {
+      "path": "skills/web-dev"
     }
   },
   "agents": {
-    "qa": {
-      "path": "agents/qa.md"
+    "orchestrator": {
+      "path": "agents/orchestrator.md"
     },
     "reviewer": {
       "path": "agents/reviewer.md"
-    },
-    "shipper": {
-      "path": "agents/shipper.md"
     }
   },
   "outputStyles": {
@@ -84,26 +65,20 @@
     "default": {
       "description": "Install the complete generic skill and agent set.",
       "skills": [
-        "a11y-audit",
         "adversarial-review",
         "architect-review",
-        "automation",
-        "code-comments",
-        "code-reuse",
         "delivery-loop",
-        "e2e-qa",
         "fast-pr-workflow",
+        "orchestrator",
         "qa-automation",
         "security-review",
         "see-it-live",
         "task-research",
-        "web-dev-backend",
-        "web-dev-frontend"
+        "web-dev"
       ],
       "agents": [
-        "qa",
-        "reviewer",
-        "shipper"
+        "orchestrator",
+        "reviewer"
       ],
       "outputStyles": [
         "terse"
