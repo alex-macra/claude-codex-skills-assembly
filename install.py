@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import copy
+import functools
+import importlib.util
 import json
 import os
 import re
@@ -14,13 +16,15 @@ import stat
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_CATALOG = ROOT / "catalog.json"
+VALIDATOR = ROOT / "scripts" / "validate.py"
 SURFACES = ("claude", "codex", "agents")
+DEFAULT_AGENT_SURFACES = ("claude", "codex")
 MANAGED_BY = "ai-skills"
 IGNORE_START = "# ai-skills generated state"
 IGNORE_END = "# /ai-skills generated state"
@@ -86,11 +90,18 @@ class SourceEntry:
     catalog: Catalog
 
 
+@dataclass(frozen=True)
+class ExtraSkill:
+    name: str
+    path: Path
+
+
 @dataclass
 class Selection:
     skills: list[SourceEntry]
     agents: list[SourceEntry]
     output_styles: list[SourceEntry]
+    extras: list[ExtraSkill] = field(default_factory=list)
 
 
 class CatalogSet:
@@ -103,6 +114,7 @@ class CatalogSet:
         self.routing_paths: list[Path] = []
         self.global_rules: dict[str, Path] = {}
         self.hooks: dict[str, Path] = {}
+        self.agent_surfaces: tuple[str, ...] | None = None
         self.allow_missing_sources = allow_missing_sources
 
         resolved_paths: set[Path] = set()
@@ -123,10 +135,26 @@ class CatalogSet:
             self._load_routing(catalog)
             self._load_paths(catalog, "globalRules", self.global_rules)
             self._load_paths(catalog, "hooks", self.hooks)
+            self._load_agent_surfaces(catalog)
 
         if not self.catalogs:
             raise InstallError("at least one catalog is required")
+        if self.agent_surfaces is None:
+            self.agent_surfaces = DEFAULT_AGENT_SURFACES
         self._validate_profile_references()
+
+    def _load_agent_surfaces(self, catalog: Catalog) -> None:
+        if self.agent_surfaces is not None:
+            return
+        surfaces = catalog.data.get("surfaces")
+        if not isinstance(surfaces, dict) or "agents" not in surfaces:
+            return
+        values = surfaces["agents"]
+        if not isinstance(values, list) or not all(value in SURFACES for value in values):
+            raise InstallError(
+                f"{catalog.path}: surfaces.agents must list surfaces from: {', '.join(SURFACES)}"
+            )
+        self.agent_surfaces = tuple(values)
 
     def _load_sources(
         self,
@@ -508,6 +536,7 @@ def empty_state() -> dict:
         "schemaVersion": 1,
         "managedBy": MANAGED_BY,
         "skills": {},
+        "extraSkills": [],
         "agents": {},
         "outputStyles": {},
         "globalRule": None,
@@ -533,6 +562,11 @@ def load_surface_state(root: Path) -> dict:
             validate_name(name, f"managed state {key} name")
             if not isinstance(source, str) or not Path(source).is_absolute():
                 raise InstallError(f"invalid managed state source for {key}.{name} in {path}")
+    extra_names = data.setdefault("extraSkills", [])
+    if not isinstance(extra_names, list):
+        raise InstallError(f"invalid managed state in {path}: extraSkills must be a list")
+    for name in extra_names:
+        validate_name(name, "managed state extraSkills name")
     output_styles = data.setdefault("outputStyles", {})
     if not isinstance(output_styles, dict):
         raise InstallError(f"invalid managed state in {path}: outputStyles must be an object")
@@ -566,17 +600,22 @@ def desired_surface_state(
     selection: Selection,
     previous: dict,
     uninstall: bool,
+    agent_surfaces: tuple[str, ...] = DEFAULT_AGENT_SURFACES,
 ) -> dict:
     if uninstall:
         return empty_state()
     return {
         "schemaVersion": 1,
         "managedBy": MANAGED_BY,
-        "skills": {entry.name: str(entry.path.resolve(strict=False)) for entry in selection.skills},
+        "skills": {
+            entry.name: str(entry.path.resolve(strict=False))
+            for entry in (*selection.skills, *selection.extras)
+        },
+        "extraSkills": sorted(entry.name for entry in selection.extras),
         "agents": {
             entry.name: str(entry.path.resolve(strict=False))
             for entry in selection.agents
-            if surface in {"claude", "codex"}
+            if surface in agent_surfaces
         },
         "outputStyles": {
             entry.name: str(entry.path.resolve(strict=False))
@@ -593,9 +632,10 @@ def surface_link_operations(
     root: Path,
     selection: Selection,
     uninstall: bool,
+    agent_surfaces: tuple[str, ...] = DEFAULT_AGENT_SURFACES,
 ) -> tuple[dict, dict, list[tuple[Path, Path, bool, set[Path]]]]:
     previous = load_surface_state(root)
-    desired = desired_surface_state(surface, selection, previous, uninstall)
+    desired = desired_surface_state(surface, selection, previous, uninstall, agent_surfaces)
     operations: list[tuple[Path, Path, bool, set[Path]]] = []
     for kind in ("skills", "agents", "outputStyles"):
         prior_entries = previous[kind]
@@ -603,13 +643,14 @@ def surface_link_operations(
         for name, raw_source in prior_entries.items():
             if name not in desired_entries:
                 operations.append((Path(raw_source), state_target(root, kind, name), True, set()))
+        selected_entries: list[SourceEntry | ExtraSkill]
         if kind == "skills":
-            selected_entries = selection.skills
+            selected_entries = [*selection.skills, *selection.extras]
         elif kind == "agents":
-            selected_entries = selection.agents
+            selected_entries = list(selection.agents)
         else:
-            selected_entries = selection.output_styles
-        if kind == "agents" and surface == "agents":
+            selected_entries = list(selection.output_styles)
+        if kind == "agents" and surface not in agent_surfaces:
             selected_entries = []
         if kind == "outputStyles" and surface != "claude":
             selected_entries = []
@@ -1076,11 +1117,58 @@ def global_rule_target(
     return roots[surface] / name, roots[surface]
 
 
+@functools.lru_cache(maxsize=None)
+def load_validator():
+    spec = importlib.util.spec_from_file_location("ai_skills_validate", VALIDATOR)
+    if spec is None or spec.loader is None or not VALIDATOR.is_file():
+        raise InstallError(f"cannot load the skill validator: {VALIDATOR}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:
+        sys.modules.pop(spec.name, None)
+        raise InstallError(f"cannot load the skill validator: {exc}") from exc
+    return module
+
+
+def discover_extra_skills(directories: list[str], catalogs: CatalogSet) -> list[ExtraSkill]:
+    if not directories:
+        return []
+    validator = load_validator()
+    catalog_roots = [catalog.root.resolve(strict=False) for catalog in catalogs.catalogs]
+    extras: dict[str, ExtraSkill] = {}
+    for raw in directories:
+        directory = Path(raw).expanduser().resolve(strict=False)
+        if not directory.is_dir():
+            raise InstallError(f"extra skills directory not found: {directory}")
+        if any(is_under(directory, root) for root in catalog_roots):
+            raise InstallError(f"extra skills directory is inside a catalog root: {directory}")
+        found = False
+        for child in sorted(directory.iterdir()):
+            marker = child / "SKILL.md"
+            if not (marker.exists() or marker.is_symlink()):
+                continue
+            found = True
+            problems = validator.check_extra_skill(child, set(catalogs.skills), catalog_roots)
+            if problems:
+                raise InstallError("invalid extra skill: " + "; ".join(problems))
+            if child.name in extras:
+                raise InstallError(f"duplicate extra skill name: {child.name}")
+            extras[child.name] = ExtraSkill(child.name, child.resolve(strict=False))
+        if not found:
+            raise InstallError(f"no skill directories with SKILL.md in {directory}")
+    return list(extras.values())
+
+
 def run_install(args: argparse.Namespace) -> int:
     catalog_paths = [Path(path) for path in (args.catalog or [DEFAULT_CATALOG])]
     catalogs = CatalogSet(catalog_paths, allow_missing_sources=args.uninstall)
     profiles = args.profile or ["default"]
     selection = catalogs.select(profiles)
+    if not args.uninstall:
+        selection.extras = discover_extra_skills(args.extra_skills, catalogs)
+    agent_surfaces = DEFAULT_AGENT_SURFACES if catalogs.agent_surfaces is None else catalogs.agent_surfaces
     actions = Actions(args.dry_run)
     migration_roots = [Path(path).expanduser().resolve(strict=False) for path in args.migrate_from]
     project = validate_project(Path(args.project)) if args.command == "project" else None
@@ -1094,7 +1182,7 @@ def run_install(args: argparse.Namespace) -> int:
     ] = {}
     for surface in surfaces:
         root = roots[surface]
-        plan = surface_link_operations(surface, root, selection, args.uninstall)
+        plan = surface_link_operations(surface, root, selection, args.uninstall, agent_surfaces)
         surface_plans[surface] = plan
         state_path = root / STATE_FILE
         require_target_parent(state_path, root)
@@ -1188,6 +1276,7 @@ def run_install(args: argparse.Namespace) -> int:
             name
             for state_data in post_states.values()
             for name in state_data["skills"]
+            if name not in state_data.get("extraSkills", [])
         }
         keep_project_state = any(
             state_data["skills"]
@@ -1255,9 +1344,12 @@ def run_install(args: argparse.Namespace) -> int:
     for surface in surfaces:
         write_surface_state(actions, roots[surface], surface_plans[surface][1])
 
+    for extra in selection.extras:
+        print(f"extra skill: {extra.name} ({extra.path})")
     verb = "uninstalled" if args.uninstall else "installed"
     print(
-        f"{verb} {len(selection.skills)} skill(s), {len(selection.agents)} agent(s), "
+        f"{verb} {len(selection.skills) + len(selection.extras)} skill(s), "
+        f"{len(selection.agents)} agent(s), "
         f"and {len(selection.output_styles)} output style(s) for {', '.join(surfaces)}"
     )
     return 0
@@ -1360,6 +1452,13 @@ def add_install_options(parser: argparse.ArgumentParser, project: bool) -> None:
         help="install activation, usage, and protected-branch command hooks",
     )
     parser.add_argument("--global-rules", action="store_true", help="install opt-in rule templates")
+    parser.add_argument(
+        "--extra-skills",
+        action="append",
+        default=[],
+        metavar="DIR",
+        help="also link each skill directory in DIR, unrouted and validated; repeatable",
+    )
     parser.add_argument("--migrate-from", action="append", default=[], help=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true", help="show changes without writing")
     parser.add_argument("--uninstall", action="store_true", help="remove managed entries")

@@ -79,9 +79,7 @@
     "Run the delivery loop on A. Never mind, cancel that. Run the delivery loop on B.": [
       "delivery-loop"
     ],
-    "Use every workflow except the delivery loop.": [
-      "automation"
-    ],
+    "Use every workflow except the delivery loop.": [],
     "Do not create a PR for legacy. Create a PR for the replacement.": [
       "fast-pr-workflow"
     ],
@@ -116,7 +114,6 @@
       "fast-pr-workflow"
     ],
     "Reuse PR 12.": [
-      "code-reuse",
       "fast-pr-workflow"
     ],
     "Please refrain from opening a pull request for legacy. Create a PR for the actual change.": [
@@ -162,10 +159,10 @@
       "fast-pr-workflow"
     ],
     "run an accessibility audit on the settings page": [
-      "a11y-audit"
+      "web-dev"
     ],
     "check WCAG keyboard navigation on the form": [
-      "a11y-audit"
+      "web-dev"
     ],
     "try to break this change": [
       "adversarial-review"
@@ -180,35 +177,34 @@
       "architect-review"
     ],
     "set up GitHub Actions for this repo": [
-      "automation"
+      "web-dev"
     ],
     "add a cron job for nightly backups": [
-      "automation"
+      "web-dev"
     ],
     "strip the redundant comments from this file": [
-      "code-comments"
+      "architect-review"
     ],
     "should I add a docstring here": [
-      "code-comments"
+      "architect-review"
     ],
     "reuse what exists instead of adding another helper": [
-      "code-reuse"
+      "architect-review"
     ],
     "is there already an existing util for this": [
-      "code-reuse"
+      "architect-review"
     ],
     "stop creating new helper functions for everything": [
-      "code-reuse"
+      "architect-review"
     ],
     "review this diff for duplication and reuse": [
-      "architect-review",
-      "code-reuse"
+      "architect-review"
     ],
     "record a trace for the failing user journey": [
-      "e2e-qa"
+      "qa-automation"
     ],
     "the Playwright headless run keeps timing out": [
-      "e2e-qa"
+      "qa-automation"
     ],
     "write unit tests for the parser": [
       "qa-automation"
@@ -235,7 +231,6 @@
       "see-it-live"
     ],
     "smoke test the deploy": [
-      "automation",
       "see-it-live"
     ],
     "research the best library for PDF parsing": [
@@ -245,16 +240,53 @@
       "task-research"
     ],
     "add a FastAPI endpoint for uploads": [
-      "web-dev-backend"
+      "web-dev"
     ],
     "fix the Express middleware ordering": [
-      "web-dev-backend"
+      "web-dev"
     ],
     "build a React component for the modal": [
-      "web-dev-frontend"
+      "web-dev"
     ],
     "style the settings page with Tailwind": [
-      "web-dev-frontend"
+      "web-dev"
+    ],
+    "play devil's advocate on the cache design": [
+      "adversarial-review"
+    ],
+    "threat model the login flow": [
+      "security-review"
+    ],
+    "find out how the cache invalidation works": [
+      "task-research"
+    ],
+    "set up CI for this repo": [
+      "web-dev"
+    ],
+    "run the orchestrator on this task and keep the loop going": [
+      "orchestrator"
+    ],
+    "oversee the agents milestone after milestone with one rolling branch": [
+      "orchestrator"
+    ],
+    "orchestrate the delivery loop for milestone 15 and keep going milestone after milestone": [
+      "delivery-loop",
+      "orchestrator"
+    ],
+    "Do not merge anything; run the orchestrator for milestone 16.": [
+      "orchestrator"
+    ],
+    "Start a long loop on this repository and pick the next milestone yourself.": [
+      "orchestrator"
+    ],
+    "supervise this session until the handoff": [
+      "orchestrator"
+    ],
+    "open a supervisor session that will watch over the other session": [
+      "orchestrator"
+    ],
+    "watch the loop and unblock it when it stalls": [
+      "orchestrator"
     ]
   },
   "negative": [
@@ -329,6 +361,18 @@
     "Skip the delivery loop.",
     "I don't want a pull request.",
     "No pull request is needed.",
-    "There should be no pull request."
+    "There should be no pull request.",
+    "Explain the term orchestrator in one sentence",
+    "Do not orchestrate anything, just list the open tasks",
+    "The next milestone review is on Monday",
+    "Do not run the orchestrator; just explain the long loop",
+    "Never start a long loop here, one task is enough",
+    "Don't keep the loop going after this task",
+    "Describe how the long loop picks the next milestone",
+    "Do not supervise this session; just answer the question",
+    "find the source of the force on the bridge deck",
+    "summarize the specification for the billing rules",
+    "draft a rapid capital budget for the quarter",
+    "the laundry dryer is broken again"
   ]
 }

@@ -65,9 +65,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(second[0], 0, second)
         for home in self.user_env.values():
             skills = Path(home) / "skills"
-            self.assertEqual(len(list(skills.iterdir())), 15)
-        self.assertEqual(len(list((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents").iterdir())), 3)
-        self.assertEqual(len(list((Path(self.user_env["CODEX_HOME"]) / "agents").iterdir())), 3)
+            self.assertEqual(len(list(skills.iterdir())), 10)
+        self.assertEqual(len(list((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents").iterdir())), 2)
+        self.assertFalse((Path(self.user_env["CODEX_HOME"]) / "agents").exists())
+        self.assertFalse((Path(self.user_env["AGENTS_HOME"]) / "agents").exists())
 
         claude_styles = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "output-styles"
         self.assertEqual([path.name for path in claude_styles.iterdir()], ["terse.md"])
@@ -100,7 +101,7 @@ class InstallerTests(unittest.TestCase):
 
         for surface in (".claude", ".codex", ".agents"):
             links = list((project / surface / "skills").glob("*/SKILL.md"))
-            self.assertEqual(len(links), 15, surface)
+            self.assertEqual(len(links), 10, surface)
             self.assertTrue(
                 (
                     project
@@ -179,7 +180,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("CLAUDE.md", block)
 
     def test_unmanaged_file_is_refused(self) -> None:
-        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "a11y-audit"
+        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "task-research"
         target.mkdir(parents=True)
         (target / "SKILL.md").write_text("unmanaged\n", encoding="utf-8")
 
@@ -190,9 +191,9 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((target / "SKILL.md").read_text(), "unmanaged\n")
 
     def test_foreign_symlink_is_refused(self) -> None:
-        foreign = self.temp / "foreign" / "a11y-audit"
+        foreign = self.temp / "foreign" / "task-research"
         foreign.mkdir(parents=True)
-        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "a11y-audit"
+        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "task-research"
         target.parent.mkdir(parents=True)
         target.symlink_to(foreign)
 
@@ -203,9 +204,9 @@ class InstallerTests(unittest.TestCase):
 
     def test_explicit_legacy_root_allows_symlink_migration(self) -> None:
         legacy = self.temp / "legacy"
-        old_source = legacy / "skills" / "a11y-audit"
+        old_source = legacy / "skills" / "task-research"
         old_source.mkdir(parents=True)
-        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "a11y-audit"
+        target = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "skills" / "task-research"
         target.parent.mkdir(parents=True)
         target.symlink_to(old_source)
 
@@ -214,7 +215,7 @@ class InstallerTests(unittest.TestCase):
         )
 
         self.assertEqual(result[0], 0, result)
-        self.assertEqual(target.resolve(), (ROOT / "skills" / "a11y-audit").resolve())
+        self.assertEqual(target.resolve(), (ROOT / "skills" / "task-research").resolve())
 
     def test_hooks_are_additive_backed_up_and_migrate_legacy_entries(self) -> None:
         settings = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "settings.json"
@@ -480,7 +481,7 @@ class InstallerTests(unittest.TestCase):
             json.dumps(
                 {
                     "schemaVersion": 1,
-                    "skills": {"a11y-audit": {"path": "skills/a11y-audit"}},
+                    "skills": {"task-research": {"path": "skills/task-research"}},
                     "profiles": {},
                 }
             ),
@@ -577,7 +578,7 @@ class InstallerTests(unittest.TestCase):
         result = self.run_main(["project", str(nested), "--surface", "agents"])
 
         self.assertEqual(result[0], 0, result)
-        self.assertTrue((project / ".agents" / "skills" / "a11y-audit").is_symlink())
+        self.assertTrue((project / ".agents" / "skills" / "task-research").is_symlink())
         self.assertFalse((project / "src" / ".agents").exists())
 
     def test_backup_never_follows_existing_backup_symlink(self) -> None:
@@ -757,8 +758,8 @@ class InstallerTests(unittest.TestCase):
         rules = json.loads(
             (project / ".claude" / "skills" / "skill-rules.json").read_text()
         )["skills"]
-        self.assertEqual(len(rules), 16)
-        self.assertIn("a11y-audit", rules)
+        self.assertEqual(len(rules), 11)
+        self.assertIn("task-research", rules)
         self.assertIn("sample-overlay", rules)
 
     def test_public_only_uninstall_removes_overlay_hooks_and_global_rule(self) -> None:
@@ -859,6 +860,243 @@ class InstallerTests(unittest.TestCase):
             if "merge-guard.py" in item["command"]
         }
         self.assertEqual(list(timeouts.values()), [50])
+
+    def overlay_catalog(
+        self,
+        name: str,
+        surfaces: dict | None = None,
+        agents: bool = False,
+        routing: bool = False,
+    ) -> Path:
+        root = self.temp / name
+        skill = root / "skills" / "sample-only"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text(
+            "---\nname: sample-only\ndescription: Sample only.\nlicense: MIT\n---\n",
+            encoding="utf-8",
+        )
+        data: dict = {
+            "schemaVersion": 1,
+            "skills": {"sample-only": {"path": "skills/sample-only"}},
+            "profiles": {"default": {"skills": ["sample-only"], "agents": []}},
+        }
+        if agents:
+            (root / "agents").mkdir()
+            (root / "agents" / "helper.md").write_text(
+                "---\nname: helper\ndescription: Helper.\n---\n", encoding="utf-8"
+            )
+            data["agents"] = {"helper": {"path": "agents/helper.md"}}
+            data["profiles"]["default"]["agents"] = ["helper"]
+        if surfaces is not None:
+            data["surfaces"] = surfaces
+        if routing:
+            (root / "rules.json").write_text(
+                json.dumps(
+                    {
+                        "skills": {
+                            "sample-only": {
+                                "priority": "medium",
+                                "promptTriggers": {"keywords": ["sample only"]},
+                                "fileTriggers": {},
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            data["routing"] = {"registry": "rules.json"}
+        catalog = root / "catalog.json"
+        catalog.write_text(json.dumps(data), encoding="utf-8")
+        return catalog
+
+    def extra_dir(self, name: str = "extras", skill: str = "extra-sample", text: str | None = None) -> Path:
+        directory = self.temp / name
+        path = directory / skill
+        path.mkdir(parents=True)
+        body = text if text is not None else f"---\nname: {skill}\ndescription: Extra sample.\n---\n# Extra\n"
+        (path / "SKILL.md").write_text(body, encoding="utf-8")
+        return directory
+
+    def test_public_catalog_declares_claude_only_agents(self) -> None:
+        catalogs = installer.CatalogSet([ROOT / "catalog.json"], allow_missing_sources=True)
+
+        self.assertEqual(("claude",), catalogs.agent_surfaces)
+        self.assertEqual({"orchestrator", "reviewer"}, set(catalogs.agents))
+
+    def test_catalog_agent_surfaces_are_honored_and_codex_agents_pruned(self) -> None:
+        catalog = self.overlay_catalog("agent-surfaces", surfaces={"agents": ["claude", "codex"]}, agents=True)
+        arguments = ["user", "--catalog", str(catalog)]
+        self.assertEqual(self.run_main(arguments)[0], 0)
+        claude_agent = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents" / "helper.md"
+        codex_agent = Path(self.user_env["CODEX_HOME"]) / "agents" / "helper.md"
+        self.assertTrue(claude_agent.is_symlink())
+        self.assertTrue(codex_agent.is_symlink())
+
+        data = json.loads(catalog.read_text(encoding="utf-8"))
+        data["surfaces"]["agents"] = ["claude"]
+        catalog.write_text(json.dumps(data), encoding="utf-8")
+        result = self.run_main(arguments)
+
+        self.assertEqual(result[0], 0, result)
+        self.assertTrue(claude_agent.is_symlink())
+        self.assertFalse(codex_agent.exists() or codex_agent.is_symlink())
+        state = json.loads((Path(self.user_env["CODEX_HOME"]) / installer.STATE_FILE).read_text())
+        self.assertEqual({}, state["agents"])
+        self.assertFalse((Path(self.user_env["AGENTS_HOME"]) / "agents").exists())
+
+    def test_agents_default_to_claude_and_codex_without_declared_surfaces(self) -> None:
+        catalog = self.overlay_catalog("default-surfaces", agents=True)
+
+        result = self.run_main(["user", "--catalog", str(catalog)])
+
+        self.assertEqual(result[0], 0, result)
+        self.assertTrue((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents" / "helper.md").is_symlink())
+        self.assertTrue((Path(self.user_env["CODEX_HOME"]) / "agents" / "helper.md").is_symlink())
+        self.assertFalse((Path(self.user_env["AGENTS_HOME"]) / "agents").exists())
+
+    def test_empty_agent_surfaces_link_no_agents(self) -> None:
+        catalog = self.overlay_catalog("no-agent-surfaces", surfaces={"agents": []}, agents=True)
+
+        result = self.run_main(["user", "--catalog", str(catalog)])
+
+        self.assertEqual(result[0], 0, result)
+        for home in self.user_env.values():
+            self.assertFalse((Path(home) / "agents").exists())
+
+    def test_unknown_agent_surface_is_refused(self) -> None:
+        catalog = self.overlay_catalog("bad-surfaces", surfaces={"agents": ["elsewhere"]}, agents=True)
+
+        result = self.run_main(["user", "--catalog", str(catalog)])
+
+        self.assertEqual(result[0], 2, result)
+        self.assertIn("surfaces.agents", result[2])
+
+    def test_extra_skills_are_linked_recorded_and_pruned_without_the_flag(self) -> None:
+        catalog = self.overlay_catalog("extra-base")
+        extras = self.extra_dir()
+        arguments = ["user", "--surface", "claude", "--catalog", str(catalog)]
+        root = Path(self.user_env["CLAUDE_CONFIG_DIR"])
+        target = root / "skills" / "extra-sample"
+
+        installed = self.run_main([*arguments, "--extra-skills", str(extras)])
+
+        self.assertEqual(installed[0], 0, installed)
+        self.assertIn("extra skill: extra-sample", installed[1])
+        self.assertIn("installed 2 skill(s)", installed[1])
+        self.assertEqual(target.resolve(), (extras / "extra-sample").resolve())
+        state = json.loads((root / installer.STATE_FILE).read_text())
+        self.assertIn("extra-sample", state["skills"])
+        self.assertEqual(["extra-sample"], state["extraSkills"])
+
+        pruned = self.run_main(arguments)
+
+        self.assertEqual(pruned[0], 0, pruned)
+        self.assertFalse(target.exists() or target.is_symlink())
+        self.assertTrue((root / "skills" / "sample-only").is_symlink())
+        self.assertEqual([], json.loads((root / installer.STATE_FILE).read_text())["extraSkills"])
+
+    def test_extra_skills_dry_run_lists_them_and_writes_nothing(self) -> None:
+        catalog = self.overlay_catalog("extra-dry")
+        extras = self.extra_dir()
+
+        result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(extras), "--dry-run"])
+
+        self.assertEqual(result[0], 0, result)
+        self.assertIn("extra skill: extra-sample", result[1])
+        self.assertIn("skills/extra-sample (dry run)", result[1])
+        self.assertFalse((self.temp / "user").exists())
+
+    def test_extra_skill_colliding_with_a_catalog_skill_is_refused(self) -> None:
+        catalog = self.overlay_catalog("extra-collision")
+        extras = self.extra_dir(skill="sample-only")
+
+        result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(extras)])
+
+        self.assertEqual(result[0], 2, result)
+        self.assertIn("collides", result[2])
+        self.assertFalse((self.temp / "user").exists())
+
+    def test_invalid_extra_skills_are_refused_before_writing(self) -> None:
+        catalog = self.overlay_catalog("extra-invalid")
+        cases = {
+            "name": ("---\nname: other-name\ndescription: Extra.\n---\n", "frontmatter name"),
+            "missing": ("no frontmatter\n", "missing YAML frontmatter"),
+            "description": (f"---\nname: extra-sample\ndescription: {'d' * 251}\n---\n", "description must be 1-250"),
+            "bash": ("---\nname: extra-sample\ndescription: Extra.\nallowed-tools: Bash\n---\n", "unscoped Bash"),
+            "cap": ("---\nname: extra-sample\ndescription: Extra.\n---\n" + "x\n" * 60, "exceed the cap"),
+        }
+        for label, (text, expected) in cases.items():
+            with self.subTest(case=label):
+                extras = self.extra_dir(name=f"invalid-{label}", text=text)
+                result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(extras)])
+                self.assertEqual(result[0], 2, result)
+                self.assertIn("invalid extra skill", result[2])
+                self.assertIn(expected, result[2])
+                self.assertFalse((self.temp / "user").exists())
+
+    def test_symlinked_extra_skill_directory_is_refused(self) -> None:
+        catalog = self.overlay_catalog("extra-symlink")
+        real = self.extra_dir(name="real-extras")
+        extras = self.temp / "linked-extras"
+        extras.mkdir()
+        (extras / "extra-sample").symlink_to(real / "extra-sample", target_is_directory=True)
+
+        result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(extras)])
+
+        self.assertEqual(result[0], 2, result)
+        self.assertIn("must not be a symlink", result[2])
+
+    def test_extra_skills_directory_inside_a_catalog_root_is_refused(self) -> None:
+        catalog = self.overlay_catalog("extra-inside")
+
+        result = self.run_main(
+            ["user", "--catalog", str(catalog), "--extra-skills", str(catalog.parent / "skills")]
+        )
+
+        self.assertEqual(result[0], 2, result)
+        self.assertIn("inside a catalog root", result[2])
+
+    def test_missing_or_empty_extra_skills_directory_is_refused(self) -> None:
+        catalog = self.overlay_catalog("extra-missing")
+        empty = self.temp / "empty-extras"
+        empty.mkdir()
+        for directory, expected in ((self.temp / "absent", "not found"), (empty, "no skill directories")):
+            with self.subTest(directory=directory.name):
+                result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(directory)])
+                self.assertEqual(result[0], 2, result)
+                self.assertIn(expected, result[2])
+
+    def test_extra_skills_stay_out_of_project_routing(self) -> None:
+        catalog = self.overlay_catalog("extra-routing", routing=True)
+        extras = self.extra_dir()
+        project = self.temp / "extra-project"
+        init_repo(project)
+
+        result = self.run_main(["project", str(project), "--catalog", str(catalog), "--extra-skills", str(extras)])
+
+        self.assertEqual(result[0], 0, result)
+        self.assertTrue((project / ".claude" / "skills" / "extra-sample").is_symlink())
+        rules = json.loads((project / ".claude" / "skills" / "skill-rules.json").read_text())["skills"]
+        self.assertEqual({"sample-only"}, set(rules))
+
+        narrowed = self.run_main(["project", str(project), "--catalog", str(catalog), "--surface", "codex"])
+
+        self.assertEqual(narrowed[0], 0, narrowed)
+        self.assertTrue((project / ".claude" / "skills" / "extra-sample").is_symlink())
+        self.assertFalse((project / ".codex" / "skills" / "extra-sample").exists())
+
+    def test_uninstall_removes_extra_skills(self) -> None:
+        catalog = self.overlay_catalog("extra-uninstall")
+        extras = self.extra_dir()
+        arguments = ["user", "--surface", "claude", "--catalog", str(catalog), "--extra-skills", str(extras)]
+        self.assertEqual(self.run_main(arguments)[0], 0)
+
+        removed = self.run_main([*arguments, "--uninstall"])
+
+        root = Path(self.user_env["CLAUDE_CONFIG_DIR"])
+        self.assertEqual(removed[0], 0, removed)
+        self.assertFalse((root / "skills" / "extra-sample").is_symlink())
+        self.assertFalse((root / installer.STATE_FILE).exists())
 
     def test_duplicate_merge_guard_blocks_are_rejected(self) -> None:
         project = self.temp / "duplicate-guard"

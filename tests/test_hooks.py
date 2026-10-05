@@ -273,6 +273,53 @@ class ActivationTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0)
 
 
+class KeywordBoundaryTests(unittest.TestCase):
+    def routes(self, keyword: str, prompt: str) -> bool:
+        entries = {"sample-skill": {"promptTriggers": {"keywords": [keyword]}}}
+        return activation.match_skills(prompt, entries) == ["sample-skill"]
+
+    def test_short_keywords_match_whole_words_only(self) -> None:
+        cases = {
+            "CI": (("set up CI for this repo", "fix the CI/CD job"), ("read the specification", "decide later")),
+            "RCE": (("is this an RCE?", "rce via the upload form"), ("check the source", "force the update")),
+            "API": (("the API is slow", "api-first design"), ("a rapid capital plan", "therapist notes")),
+            "E2E": (("write E2E tests", "run the e2e suite"), ("build be2e7 now", "the e2ex tool")),
+            "DRY": (("keep it DRY", "dry run first"), ("the laundry dryer", "a sundry list")),
+        }
+        for keyword, (positives, negatives) in cases.items():
+            for prompt in positives:
+                with self.subTest(keyword=keyword, prompt=prompt):
+                    self.assertTrue(self.routes(keyword, prompt))
+            for prompt in negatives:
+                with self.subTest(keyword=keyword, prompt=prompt):
+                    self.assertFalse(self.routes(keyword, prompt))
+
+    def test_boundaries_apply_only_at_alphanumeric_keyword_edges(self) -> None:
+        self.assertTrue(self.routes("it(", "it('works', () => {})"))
+        self.assertFalse(self.routes("it(", "split(value)"))
+
+    def test_longer_keywords_keep_substring_matching(self) -> None:
+        self.assertTrue(self.routes("deploy", "redeploying the service"))
+        self.assertTrue(self.routes("tests", "pytests pass"))
+
+    def test_public_registry_ignores_short_keyword_substrings(self) -> None:
+        entries = activation.load_rules(ROOT / "routing" / "skill-rules.json")
+
+        self.assertNotIn("security-review", activation.match_skills("find the source of the force", entries))
+        self.assertEqual([], activation.match_skills("summarize the specification", entries))
+        self.assertIn("security-review", activation.match_skills("is this an RCE", entries))
+
+    def test_every_routed_skill_has_three_positive_fixtures(self) -> None:
+        rules = json.loads((ROOT / "routing" / "skill-rules.json").read_text(encoding="utf-8"))["skills"]
+        fixtures = json.loads((ROOT / "routing" / "routing-expectations.json").read_text(encoding="utf-8"))
+        counts = {name: 0 for name in rules}
+        for expected in fixtures["positive"].values():
+            for name in expected:
+                counts[name] = counts.get(name, 0) + 1
+
+        self.assertEqual({}, {name: count for name, count in counts.items() if count < 3})
+
+
 class UsageLogTests(unittest.TestCase):
     def run_usage(self, payload: object, environment: dict[str, str]) -> int:
         with (

@@ -25,7 +25,7 @@ This is an optional starting point. Keep repository-specific conventions in the 
 
 - Default to zero comments. Code and tests carry the meaning; a comment earns its place only by stating a non-obvious why.
 - Never write comments that restate the code, reference a ticket or PR, note provenance, or narrate a change.
-- See the `code-comments` skill for the full guidance.
+- See the `architect-review` skill for the full guidance.
 
 ## Report concisely
 

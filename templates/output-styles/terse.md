@@ -13,4 +13,4 @@ Lead with what happened. Add detail only when it changes what the reader does ne
 
 Terse does not mean incomplete. Keep exact commands and real output; report a failure in full, with what failed and why.
 
-Default to zero code comments - see the `code-comments` skill for when one is earned.
+Default to zero code comments - see the `architect-review` skill for when one is earned.

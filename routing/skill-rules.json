@@ -2,37 +2,6 @@
   "version": "1.0",
   "description": "Activation triggers for the generic skills shipped by this catalog.",
   "skills": {
-    "a11y-audit": {
-      "type": "domain",
-      "priority": "medium",
-      "description": "Dedicated accessibility audit - axe/Lighthouse plus a WCAG 2.2 AA manual checklist, severity-ranked findings with fixes.",
-      "promptTriggers": {
-        "keywords": [
-          "accessibility",
-          "accessibility audit",
-          "a11y",
-          "a11y audit",
-          "WCAG",
-          "wcag audit",
-          "screen reader",
-          "VoiceOver",
-          "NVDA",
-          "axe-core",
-          "axe scan",
-          "lighthouse accessibility",
-          "contrast ratio",
-          "keyboard navigation"
-        ],
-        "intentPatterns": [
-          "(run|do|perform|conduct).*?(a11y|accessibility|wcag).*?(audit|scan|review|check)",
-          "(audit|scan|check|test).*?(a11y|accessibility|wcag|screen reader)",
-          "(is (this|it)|are we).*?(accessible|wcag|a11y)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": []
-      }
-    },
     "adversarial-review": {
       "type": "process",
       "priority": "medium",
@@ -66,7 +35,7 @@
     "architect-review": {
       "type": "process",
       "priority": "medium",
-      "description": "Clean code and architecture evaluation - boundaries, coupling, abstraction, naming, complexity hotspots.",
+      "description": "Design and code review - boundaries, coupling, abstraction, naming, complexity hotspots, reuse before writing, and comment hygiene.",
       "promptTriggers": {
         "keywords": [
           "architecture",
@@ -90,120 +59,7 @@
           "cyclomatic",
           "extract",
           "rename",
-          "decouple"
-        ],
-        "intentPatterns": [
-          "(review|audit|evaluate|critique|assess).*?(code|design|architecture|module|file|PR|diff)",
-          "(refactor|restructure|reorganize|clean up|simplify).*?(this|the|module|file|class|function)",
-          "(too (complex|long|coupled)|hard to (test|read|change))",
-          "(should this|is this|what.?s wrong with).*?(design|architecture|pattern|approach)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": []
-      }
-    },
-    "automation": {
-      "type": "process",
-      "priority": "medium",
-      "description": "Repeatable infrastructure - CI/CD, deploy scripts, dev-server orchestration, scheduled jobs, container builds, releases, backups.",
-      "promptTriggers": {
-        "keywords": [
-          "CI",
-          "CI/CD",
-          "GitHub Actions",
-          "workflow",
-          "pipeline",
-          "deploy",
-          "deployment",
-          "release",
-          "Docker",
-          "Dockerfile",
-          "container",
-          "image",
-          "registry",
-          "cron",
-          "schedule",
-          "scheduled job",
-          "systemd timer",
-          "rollback",
-          "backup",
-          "restore",
-          "PM2",
-          "nodemon",
-          "build script",
-          "deploy script",
-          "Makefile"
-        ],
-        "intentPatterns": [
-          "(set up|configure|fix).*?(CI|workflow|pipeline|github actions|action)",
-          "(deploy|release|ship|publish).*?(to (staging|production|prod|preview))",
-          "(automate|script|cron|schedule).*?(task|job|build|deploy|backup)",
-          "(rollback|revert).*?(deploy|release|version)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": [
-          ".github/workflows/**",
-          "**/Dockerfile",
-          "**/docker-compose*.yml",
-          "**/docker-compose*.yaml",
-          "**/Makefile",
-          "**/justfile",
-          "**/deploy*.sh",
-          "**/release*.sh",
-          "**/backup*.sh",
-          "**/.gitlab-ci.yml",
-          "**/azure-pipelines.yml",
-          "**/ecosystem.config.*"
-        ],
-        "pathExclusions": [
-          "**/node_modules/**",
-          "**/dist/**"
-        ]
-      }
-    },
-    "code-comments": {
-      "type": "process",
-      "priority": "medium",
-      "description": "When and how to comment - default none, comment only the non-obvious WHY. Strips restatement, ticket refs, provenance notes, and verbose preambles.",
-      "promptTriggers": {
-        "keywords": [
-          "comment",
-          "comments",
-          "commenting",
-          "docstring",
-          "doc comment",
-          "jsdoc",
-          "tsdoc",
-          "block comment",
-          "inline comment",
-          "code comment",
-          "uncomment",
-          "commented out",
-          "explain this code",
-          "add a note",
-          "document this function",
-          "header comment"
-        ],
-        "intentPatterns": [
-          "(add|write|remove|strip|clean up|reduce|trim).*?(comment|docstring|jsdoc|tsdoc)",
-          "(too many|fewer|less|minimal|verbose).*?comment",
-          "(should (i|we)|do (i|we) need).*?comment",
-          "(document|annotate).*?(function|method|class|module|file)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": []
-      }
-    },
-    "code-reuse": {
-      "type": "process",
-      "priority": "medium",
-      "description": "Reuse before writing - find the existing helper and extend it instead of adding a near-duplicate.",
-      "promptTriggers": {
-        "keywords": [
-          "reuse",
+          "decouple",
           "code reuse",
           "reusability",
           "duplicate code",
@@ -216,13 +72,31 @@
           "reinvent",
           "new helper",
           "new utility",
-          "shared helper"
+          "shared helper",
+          "docstring",
+          "doc comment",
+          "jsdoc",
+          "tsdoc",
+          "block comment",
+          "inline comment",
+          "code comment",
+          "commented out",
+          "document this function",
+          "header comment"
         ],
         "intentPatterns": [
-          "(reuse|re-use).*?(existing|current|what.?s there|code|helper|component)",
+          "(review|audit|evaluate|critique|assess).*?(code|design|architecture|module|file|PR|diff)",
+          "(refactor|restructure|reorganize|clean up|simplify).*?(this|the|module|file|class|function)",
+          "(too (complex|long|coupled)|hard to (test|read|change))",
+          "(should this|is this|what.?s wrong with).*?(design|architecture|pattern|approach)",
+          "(reuse|re-use).*?(existing|exists|current|what.?s there|code|helper|component)",
           "(duplicate|duplicated|duplication|copy.?paste).*?(code|logic|helper|function|component)",
           "(is there|do we|does this).*?(already|existing).*?(function|helper|util|component|implementation)",
-          "(stop|avoid|don.?t).*?(writing|adding|creating).*?(new|another).*?(function|helper|util|wrapper)"
+          "(stop|avoid|don.?t).*?(writing|adding|creating).*?(new|another).*?(function|helper|util|wrapper)",
+          "(add|write|remove|strip|clean up|reduce|trim).*?(comment|docstring|jsdoc|tsdoc)",
+          "(too many|fewer|less|minimal|verbose).*?comment",
+          "(should (i|we)|do (i|we) need).*?comment",
+          "(document|annotate).*?(function|method|class|module|file)"
         ]
       },
       "fileTriggers": {
@@ -232,7 +106,7 @@
     "delivery-loop": {
       "type": "process",
       "priority": "high",
-      "description": "Execute approved task Markdown through repository validation, implementation, test/build, and bounded fix/retest before an optional PR handoff.",
+      "description": "Execute approved task Markdown through implementation, review, adversarial testing, final smoke, commit, push, and one verified PR handoff.",
       "promptTriggers": {
         "keywords": [
           "delivery loop",
@@ -275,49 +149,6 @@
       },
       "fileTriggers": {
         "pathPatterns": []
-      }
-    },
-    "e2e-qa": {
-      "type": "process",
-      "priority": "high",
-      "description": "End-to-end testing - Playwright, Cypress, real browser/CLI/HTTP flows. Locator discipline, network handling, parallelization, flake elimination.",
-      "promptTriggers": {
-        "keywords": [
-          "E2E",
-          "end-to-end",
-          "Playwright",
-          "Cypress",
-          "page.getByRole",
-          "cy.get",
-          "browser test",
-          "storageState",
-          "trace viewer",
-          "headless",
-          "user journey",
-          "intercept",
-          "stub network",
-          "fully parallel"
-        ],
-        "intentPatterns": [
-          "(write|add|fix|debug).*?(e2e|end.?to.?end|playwright|cypress).*?(test|spec|flow)",
-          "(flak[ey]|retry|sharding).*?(e2e|playwright|cypress|browser)",
-          "(record|trace|video).*?(test|run|failure)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": [
-          "**/e2e/**",
-          "**/playwright.config.*",
-          "**/cypress.config.*",
-          "**/cypress/**",
-          "**/*.e2e.ts",
-          "**/*.e2e.tsx",
-          "**/*.e2e.js"
-        ],
-        "pathExclusions": [
-          "**/node_modules/**",
-          "**/dist/**"
-        ]
       }
     },
     "fast-pr-workflow": {
@@ -382,10 +213,46 @@
         "pathPatterns": []
       }
     },
+    "orchestrator": {
+      "type": "process",
+      "priority": "high",
+      "description": "Supervise delivery work - a loop in this session, a whole session, or other sessions; check in, unblock, escalate owner decisions, and conduct several packets with one rolling PR.",
+      "promptTriggers": {
+        "keywords": [
+          "run the orchestrator",
+          "orchestrate the delivery",
+          "orchestrate delivery",
+          "long loop",
+          "keep the loop going",
+          "milestone after milestone",
+          "oversee the delivery",
+          "oversee the agents",
+          "supervise this session",
+          "watch over the session",
+          "watch the loop"
+        ],
+        "intentPatterns": [
+          "(?is)\\b(?:orchestrate|oversee|coordinate|supervise)\\b[^.;\\n]{0,80}\\b(?:delivery|loop|agents|workers|milestone)s?\\b",
+          "(?is)\\b(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop\\b",
+          "(?is)\\bkeep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going\\b",
+          "(?is)\\bmilestone\\s+after\\s+milestone\\b",
+          "(?is)\\b(?:supervise|oversee|watch\\s+over)\\b[^.;\\n]{0,40}\\b(?:sessions?|loop)\\b"
+        ],
+        "excludePatterns": [
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:orchestrate|oversee|coordinate|supervise|watch)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:run|start|use|launch|spawn|invoke)\\b[^.;\\n]{0,40}\\borchestrator\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:(?:run|start|use|launch|begin|open)\\b[^.;\\n]{0,30}\\b(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop|keep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,40}\\b(?:explain|define|describe|translate|quote|repeat|summarize)\\b[^.;\\n]{0,240}\\b(?:orchestrator|(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop|keep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going|milestone\\s+after\\s+milestone)\\b[^.;\\n]*(?=[.;\\n]|\\Z)"
+        ]
+      },
+      "fileTriggers": {
+        "pathPatterns": []
+      }
+    },
     "qa-automation": {
       "type": "process",
       "priority": "high",
-      "description": "Writing and running automated tests - unit / integration, fixtures, mocks-vs-reals, flake hunting. E2E covered by e2e-qa.",
+      "description": "Writing and running automated tests - unit, integration, and browser, CLI, and HTTP end-to-end flows; fixtures, mocks vs real dependencies, locators, flake hunting.",
       "promptTriggers": {
         "keywords": [
           "tests",
@@ -404,12 +271,29 @@
           "snapshot",
           "describe(",
           "it(",
-          "expect("
+          "expect(",
+          "E2E",
+          "end-to-end",
+          "Playwright",
+          "Cypress",
+          "page.getByRole",
+          "cy.get",
+          "browser test",
+          "storageState",
+          "trace viewer",
+          "headless",
+          "user journey",
+          "intercept",
+          "stub network",
+          "fully parallel"
         ],
         "intentPatterns": [
           "(write|add|create|generate).*?(test|spec|fixture)",
           "(run|fix|debug).*?(tests|test suite|suite|pytest|vitest|jest)",
-          "(coverage|flak[ey]|red.*green|test.*fail)"
+          "(coverage|flak[ey]|red.*green|test.*fail)",
+          "(write|add|fix|debug).*?(e2e|end.?to.?end|playwright|cypress).*?(test|spec|flow)",
+          "(flak[ey]|retry|sharding).*?(e2e|playwright|cypress|browser)",
+          "(record|trace|video).*?(test|run|failure)"
         ]
       },
       "fileTriggers": {
@@ -426,13 +310,19 @@
           "**/__tests__/**",
           "**/vitest.config.*",
           "**/jest.config.*",
-          "**/conftest.py"
+          "**/conftest.py",
+          "**/e2e/**",
+          "**/playwright.config.*",
+          "**/cypress.config.*",
+          "**/cypress/**",
+          "**/*.e2e.ts",
+          "**/*.e2e.tsx",
+          "**/*.e2e.js"
         ],
         "pathExclusions": [
           "**/node_modules/**",
           "**/dist/**",
-          "**/.venv/**",
-          "**/e2e/**"
+          "**/.venv/**"
         ]
       }
     },
@@ -579,10 +469,10 @@
         "pathPatterns": []
       }
     },
-    "web-dev-backend": {
+    "web-dev": {
       "type": "stack",
       "priority": "medium",
-      "description": "Web backend - Node.js/TypeScript (Express, Fastify) and Python (FastAPI, Django, Flask). Async I/O, data pipelines, types, packaging.",
+      "description": "Web development in TypeScript and Python - components, state, routes, validation, accessibility, and deploy and CI basics.",
       "promptTriggers": {
         "keywords": [
           "Express",
@@ -616,50 +506,7 @@
           "poetry",
           "ruff",
           "mypy",
-          "pyright"
-        ],
-        "intentPatterns": [
-          "(write|add|fix|refactor).*?(endpoint|route|service|handler|model|schema|controller)",
-          "(parse|validate|process).*?(request|payload|json|body)",
-          "(async|await).*?(node|python|fastapi|express)",
-          "(migration|schema).*?(database|db|sqlite|postgres|mysql)"
-        ]
-      },
-      "fileTriggers": {
-        "pathPatterns": [
-          "api/**/*.ts",
-          "api/**/*.py",
-          "backend/**/*.ts",
-          "backend/**/*.py",
-          "server/**/*.ts",
-          "server/**/*.py",
-          "preprocessor/**/*.py",
-          "**/pyproject.toml",
-          "**/requirements*.txt",
-          "**/routes/**/*.ts",
-          "**/middleware/**/*.ts"
-        ],
-        "pathExclusions": [
-          "**/.venv/**",
-          "**/__pycache__/**",
-          "**/*.ipynb",
-          "**/node_modules/**",
-          "**/dist/**",
-          "**/*.test.ts",
-          "**/*.spec.ts",
-          "**/test_*.py",
-          "**/*_test.py",
-          "**/tests/**",
-          "**/conftest.py"
-        ]
-      }
-    },
-    "web-dev-frontend": {
-      "type": "stack",
-      "priority": "medium",
-      "description": "Web frontend - TypeScript + React/Vue/Svelte components, hooks, state, styling, a11y, perf.",
-      "promptTriggers": {
-        "keywords": [
+          "pyright",
           "frontend",
           "React",
           "JSX",
@@ -679,16 +526,75 @@
           "organisms",
           "CSS variable",
           "design tokens",
-          "dark mode"
+          "dark mode",
+          "CI",
+          "CI/CD",
+          "GitHub Actions",
+          "pipeline",
+          "deployment",
+          "release",
+          "Docker",
+          "Dockerfile",
+          "container",
+          "image",
+          "registry",
+          "cron",
+          "schedule",
+          "scheduled job",
+          "systemd timer",
+          "rollback",
+          "backup",
+          "restore",
+          "PM2",
+          "nodemon",
+          "build script",
+          "deploy script",
+          "Makefile",
+          "accessibility",
+          "accessibility audit",
+          "a11y",
+          "a11y audit",
+          "WCAG",
+          "wcag audit",
+          "screen reader",
+          "VoiceOver",
+          "NVDA",
+          "axe-core",
+          "axe scan",
+          "lighthouse accessibility",
+          "contrast ratio",
+          "keyboard navigation"
         ],
         "intentPatterns": [
+          "(write|add|fix|refactor).*?(endpoint|route|service|handler|model|schema|controller)",
+          "(parse|validate|process).*?(request|payload|json|body)",
+          "(async|await).*?(node|python|fastapi|express)",
+          "(migration|schema).*?(database|db|sqlite|postgres|mysql)",
           "(build|add|change|fix|style).*?(component|page|view|screen|UI|form|modal|button|toast|dialog)",
           "(render|display|show).*?(in (the )?(browser|frontend|UI))",
-          "(theme|themes|theming|accent|palette).*?(component|app|system)"
+          "(theme|themes|theming|accent|palette).*?(component|app|system)",
+          "(set up|configure|fix).*?(\\bCI\\b|workflow|pipeline|github actions|\\bactions?\\b)",
+          "(deploy|release|ship|publish).*?(to (staging|production|prod|preview))",
+          "(automate|script|cron|schedule).*?(task|job|build|deploy|backup)",
+          "(rollback|revert).*?(deploy|release|version)",
+          "(run|do|perform|conduct).*?(a11y|accessibility|wcag).*?(audit|scan|review|check)",
+          "(audit|scan|check|test).*?(a11y|accessibility|wcag|screen reader)",
+          "(is (this|it)|are we).*?(accessible|wcag|a11y)"
         ]
       },
       "fileTriggers": {
         "pathPatterns": [
+          "api/**/*.ts",
+          "api/**/*.py",
+          "backend/**/*.ts",
+          "backend/**/*.py",
+          "server/**/*.ts",
+          "server/**/*.py",
+          "preprocessor/**/*.py",
+          "**/pyproject.toml",
+          "**/requirements*.txt",
+          "**/routes/**/*.ts",
+          "**/middleware/**/*.ts",
           "frontend/**/*.ts",
           "frontend/**/*.tsx",
           "frontend/**/*.css",
@@ -696,11 +602,32 @@
           "**/*.tsx",
           "**/*.vue",
           "**/*.svelte",
-          "**/tailwind.config.*"
+          "**/tailwind.config.*",
+          ".github/workflows/**",
+          "**/Dockerfile",
+          "**/docker-compose*.yml",
+          "**/docker-compose*.yaml",
+          "**/Makefile",
+          "**/justfile",
+          "**/deploy*.sh",
+          "**/release*.sh",
+          "**/backup*.sh",
+          "**/.gitlab-ci.yml",
+          "**/azure-pipelines.yml",
+          "**/ecosystem.config.*"
         ],
         "pathExclusions": [
+          "**/.venv/**",
+          "**/__pycache__/**",
+          "**/*.ipynb",
           "**/node_modules/**",
-          "**/dist/**"
+          "**/dist/**",
+          "**/*.test.ts",
+          "**/*.spec.ts",
+          "**/test_*.py",
+          "**/*_test.py",
+          "**/tests/**",
+          "**/conftest.py"
         ]
       }
     }

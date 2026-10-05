@@ -27,6 +27,7 @@ MAX_INTENT_PROMPT_CHARS = 8_192
 MAX_PROMPT_SCOPES = 32
 MAX_REGEX_REPEAT = 1_000
 REGEX_TIMEOUT_SECONDS = 0.02
+SHORT_KEYWORD_MAX_CHARS = 4
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CATALOG = REPO_ROOT / "catalog.json"
@@ -260,8 +261,17 @@ def available_skills() -> set[str]:
     return names
 
 
+def matches_keyword(prompt_lc: str, keyword: str) -> bool:
+    needle = keyword.lower()
+    if not 0 < len(needle) <= SHORT_KEYWORD_MAX_CHARS:
+        return needle in prompt_lc
+    before = r"(?<![a-z0-9])" if needle[0].isalnum() else ""
+    after = r"(?![a-z0-9])" if needle[-1].isalnum() else ""
+    return re.search(before + re.escape(needle) + after, prompt_lc) is not None
+
+
 def matches_keywords(prompt_lc: str, keywords: list) -> bool:
-    return any(isinstance(keyword, str) and keyword.lower() in prompt_lc for keyword in keywords)
+    return any(isinstance(keyword, str) and matches_keyword(prompt_lc, keyword) for keyword in keywords)
 
 
 def is_safe_intent_pattern(pattern: str) -> bool:
