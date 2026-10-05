@@ -106,7 +106,7 @@
     "delivery-loop": {
       "type": "process",
       "priority": "high",
-      "description": "Execute approved task Markdown through implementation, review, adversarial testing, final smoke, commit, push, and one verified PR handoff.",
+      "description": "Execute approved task Markdown through eight phases: validate, implement, test and build, fix and retest, architecture and adversarial review, final smoke, commit and push with one open PR, and remote handoff verification. Merge stays separate.",
       "promptTriggers": {
         "keywords": [
           "delivery loop",
