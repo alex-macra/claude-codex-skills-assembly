@@ -490,6 +490,28 @@ class ValidatorTests(unittest.TestCase):
 
         self.assertEqual(set(links), caps)
 
+    def test_symlinked_skill_directory_is_rejected(self) -> None:
+        name = SKILL_NAMES[0]
+        hidden = self.root / "docs" / name
+        hidden.mkdir(parents=True)
+        (hidden / "SKILL.md").write_text(skill_text(name, 65, extra_frontmatter="allowed-tools: Bash\n"), encoding="utf-8")
+        skill_dir = self.root / "skills" / name
+        shutil.rmtree(skill_dir)
+        skill_dir.symlink_to(Path("../docs") / name, target_is_directory=True)
+
+        caps = {item.path for item in self.errors_for("caps") if "not a symlink" in item.message}
+
+        self.assertEqual({f"skills/{name}"}, caps)
+
+    def test_symlinked_references_directory_is_rejected(self) -> None:
+        name = SKILL_NAMES[1]
+        self.write("docs/refs/long.md", numbered_lines(81))
+        (self.root / "skills" / name / "references").symlink_to(Path("../../docs/refs"), target_is_directory=True)
+
+        caps = {item.path for item in self.errors_for("caps") if "not a symlink" in item.message}
+
+        self.assertEqual({f"skills/{name}/references"}, caps)
+
     def test_dangling_name_check_ignores_keys_paths_and_known_names(self) -> None:
         self.add_catalog_skill("delivery-loop")
         self.write("CONTRIBUTING.md", CONTRIBUTING_KEY_LINE + "\n")

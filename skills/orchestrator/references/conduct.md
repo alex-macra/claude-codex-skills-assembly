@@ -18,6 +18,7 @@ Brief: objective in one sentence; repository, worktree, base commit, write set; 
 
 Return, exactly one of:
 - `DONE <sha> <handoff>`
+- `NO_CHANGE_NEEDED <acceptance evidence>`: readiness found the work already present; every acceptance case passes with no commit
 - `BLOCKED <question> | <options> | <default> | <evidence path:line>`
 - `BUDGET <left>`
 - `REFUSED <rule>`
@@ -30,7 +31,7 @@ Create the worktree yourself from the rolling tip: `git worktree add -b <task-br
 
 ## Claim before dispatch
 
-You claim a tracked task, never its builder: after `REPIN ok`, choose the run ID and run tracker `claim --packet <file>` before dispatch. Exit 3: do not dispatch; record the task `blocked` and move on. A `skipped` line: retry once, then block the task; never dispatch an unclaimed tracked task. A builder that returns `BLOCKED` gets `checkpoint --phase blocked --outcome blocked` from you.
+You claim a tracked task, never its builder: after `REPIN ok`, choose the run ID and run tracker `claim --packet <file>` before dispatch. Exit 3: do not dispatch; record the task `blocked` and move on. A `skipped` line: retry once, then block the task; never dispatch an unclaimed tracked task. A builder that returns `BLOCKED` gets `checkpoint --phase blocked --outcome blocked` from you. One that returns `NO_CHANGE_NEEDED` lands nothing: close its claim with `checkpoint --phase complete --outcome passed --evidence <acceptance evidence>`, then mark the task `done`.
 
 ## Landing
 

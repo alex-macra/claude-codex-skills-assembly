@@ -168,6 +168,12 @@ class OrchestratorSkillTests(unittest.TestCase):
         self.assertIn("`claim --packet <file>` before dispatch", claim)
         self.assertIn("Exit 3: do not dispatch", claim)
         self.assertIn("never dispatch an unclaimed tracked task", claim)
+        self.assertIn("`NO_CHANGE_NEEDED <acceptance evidence>`", section(conduct, "Brief and return"))
+        self.assertIn(
+            "`NO_CHANGE_NEEDED` lands nothing: close its claim with "
+            "`checkpoint --phase complete --outcome passed --evidence <acceptance evidence>`",
+            claim,
+        )
         self.assertIn("the task's run ID", section(conduct, "Brief and return"))
         self.assertIn("under a conductor, by the conductor before dispatch", read(TRACKER_MD))
         self.assertIn(

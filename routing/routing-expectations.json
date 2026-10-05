@@ -288,6 +288,15 @@
     "watch the loop and unblock it when it stalls": [
       "orchestrator"
     ],
+    "watch over the loop": [
+      "orchestrator"
+    ],
+    "starting a session that watches over other session": [
+      "orchestrator"
+    ],
+    "watch over an entire session": [
+      "orchestrator"
+    ],
     "how do I supervise a child process loop in python": [
       "task-research",
       "web-dev"
@@ -390,6 +399,8 @@
     "this for loop is a long loop, can you make it faster",
     "the event loop blocks; a continuous loop polls the socket",
     "coordinate the loop variables in this function",
+    "in the debugger, watch the loop variable until it reaches 10",
+    "Never start a session that watches over other sessions",
     "consolidate the two config files",
     "fix this regular expression",
     "the secretary emailed me",

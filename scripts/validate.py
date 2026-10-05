@@ -1142,14 +1142,33 @@ def cap_message(row: CapRow) -> str:
     return f"{row.lines} lines and {row.size} bytes exceed the cap of {cap}"
 
 
+def catalog_tree_symlinks(root: Path) -> list[Path]:
+    found: list[Path] = []
+    for top in ("skills", "agents"):
+        base = root / top
+        if base.is_symlink():
+            found.append(base)
+            continue
+        for current, directories, filenames in os.walk(base):
+            directories.sort()
+            found.extend(
+                candidate
+                for candidate in (Path(current) / name for name in directories + sorted(filenames))
+                if candidate.is_symlink()
+            )
+    return found
+
+
 def check_md_caps(root: Path, entries: list[Path], files: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     for path in entries:
         relative = PurePosixPath(path.relative_to(root).as_posix())
         if path.is_file() and nested_reference(relative):
             findings.append(finding("caps", relative, "references must be one level deep"))
-        if path.is_symlink() and md_cap_kind(relative) not in {None, "markdown"}:
-            findings.append(finding("caps", relative, "must be a regular file, not a symlink"))
+    for path in catalog_tree_symlinks(root):
+        findings.append(
+            finding("caps", path.relative_to(root), "must be a regular file or real directory, not a symlink")
+        )
     for row in md_cap_rows(root, files):
         if not row.within:
             findings.append(finding("caps", row.path, cap_message(row)))

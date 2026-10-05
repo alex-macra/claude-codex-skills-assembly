@@ -236,10 +236,11 @@
           "(?is)\\b(?:long|rolling|continuous|autonomous)\\s+loop\\b[^.;\\n]{0,80}\\b(?:milestones?|packets?)\\b",
           "(?is)\\bkeep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going\\b",
           "(?is)\\bmilestone\\s+after\\s+milestone\\b",
-          "(?is)\\b(?:supervise|oversee|watch\\s+over)\\b[^.;\\n]{0,40}\\b(?:sessions?|delivery\\s+loop)\\b"
+          "(?is)\\b(?:supervise|supervises|supervising|oversee|oversees|overseeing|(?:watch|watches|watching)\\s+over)\\b[^.;\\n]{0,40}\\b(?:sessions?|(?:delivery|the)\\s+loop)\\b"
         ],
         "excludePatterns": [
-          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:orchestrate|oversee|coordinate|supervise|watch)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
+          "(?is)\\b(?:watch|watches|watching)\\s+(?:the\\s+)?loop\\s+(?:variables?|counters?|index|indices|values?)\\b",
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:orchestrate|oversee|coordinate|supervise|supervises|supervising|watch|watches|watching)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
           "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:run|start|use|launch|spawn|invoke)\\b[^.;\\n]{0,40}\\borchestrator\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
           "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:(?:run|start|use|launch|begin|open)\\b[^.;\\n]{0,30}\\b(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop|keep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
           "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,40}\\b(?:explain|define|describe|translate|quote|repeat|summarize)\\b[^.;\\n]{0,240}\\b(?:orchestrator|(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop|keep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going|milestone\\s+after\\s+milestone)\\b[^.;\\n]*(?=[.;\\n]|\\Z)"
