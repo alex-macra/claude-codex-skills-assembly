@@ -1,15 +1,54 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+PHASES = (
+    "Validate task Markdown",
+    "Implement",
+    "Test and build",
+    "Fix and retest",
+    "Architecture and adversarial review",
+    "Final smoke",
+    "Commit, push, and open PR",
+    "Verify remote handoff",
+)
+PHASE_SKILLS = {
+    "Validate task Markdown": ("task-research",),
+    "Implement": ("web-dev",),
+    "Test and build": ("qa-automation",),
+    "Fix and retest": ("qa-automation",),
+    "Architecture and adversarial review": (
+        "architect-review",
+        "adversarial-review",
+        "security-review",
+    ),
+    "Final smoke": ("see-it-live",),
+    "Commit, push, and open PR": ("fast-pr-workflow",),
+    "Verify remote handoff": ("fast-pr-workflow",),
+}
+TRACKER_VERBS = ("next", "claim", "checkpoint", "review", "finish")
+REMOVED_NAMES = (
+    "a11y-audit",
+    "automation",
+    "code-comments",
+    "code-reuse",
+    "e2e-qa",
+    "web-dev-backend",
+    "web-dev-frontend",
+    "shipper",
+    "qa",
+)
 
 
 def load_activation():
@@ -29,6 +68,32 @@ def public_registry() -> dict:
     return json.loads((ROOT / "routing/skill-rules.json").read_text(encoding="utf-8"))["skills"]
 
 
+def phase_blocks(skill: str) -> dict[str, str]:
+    body = skill[skill.index("## Eight phases") :]
+    body = body[: body.index("\n## ", 1)]
+    matches = list(re.finditer(r"^\d+\. \*\*(.+?)\*\*", body, flags=re.MULTILINE))
+    return {
+        match.group(1): body[match.end() : matches[index + 1].start() if index + 1 < len(matches) else len(body)]
+        for index, match in enumerate(matches)
+    }
+
+
+def section(text: str, heading: str) -> str:
+    start = text.index(f"\n## {heading}\n")
+    end = text.find("\n## ", start + 1)
+    return text[start : end if end != -1 else len(text)]
+
+
+def frontmatter_description(text: str) -> str:
+    line = next(line for line in text.splitlines() if line.startswith("description:"))
+    return ast.literal_eval(line.split(":", 1)[1].strip())
+
+
+def tracker_stub(reference: str) -> str:
+    start = reference.rindex("```sh\n") + len("```sh\n")
+    return reference[start : reference.index("```", start)]
+
+
 class DeliveryLoopContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.skill = (ROOT / "skills/delivery-loop/SKILL.md").read_text(encoding="utf-8")
@@ -36,32 +101,89 @@ class DeliveryLoopContractTests(unittest.TestCase):
             ROOT / "skills/delivery-loop/references/delivery-checklist.md"
         ).read_text(encoding="utf-8")
         self.fast_pr = (ROOT / "skills/fast-pr-workflow/SKILL.md").read_text(encoding="utf-8")
-
-    def test_delivery_has_exact_four_phase_order(self) -> None:
-        phases = re.findall(r"^\d+\. \*\*(.+?)\*\*", self.skill, flags=re.MULTILINE)
-
-        self.assertEqual(
-            ["Validate task Markdown", "Implement", "Test and build", "Fix and retest"],
-            phases,
+        self.tracker = (ROOT / "skills/delivery-loop/references/tracker.md").read_text(
+            encoding="utf-8"
         )
 
-    def test_checklist_has_exact_four_phase_order(self) -> None:
+    def test_delivery_has_exact_eight_phase_order(self) -> None:
+        phases = re.findall(r"^\d+\. \*\*(.+?)\*\*", self.skill, flags=re.MULTILINE)
+
+        self.assertEqual(list(PHASES), phases)
+
+    def test_checklist_has_exact_eight_phase_order(self) -> None:
         rows = [
             line.split("|")[1].strip()
             for line in self.checklist.splitlines()
             if line.startswith("| ") and not line.startswith("| ---")
         ]
+        sections = re.findall(r"^## \d+\. (.+)$", self.checklist, flags=re.MULTILINE)
 
-        self.assertEqual(
-            [
-                "Phase",
-                "Validate task Markdown",
-                "Implement",
-                "Test and build",
-                "Fix and retest",
-            ],
-            rows,
-        )
+        self.assertEqual(["Phase", *PHASES], rows)
+        self.assertEqual(list(PHASES), sections)
+
+    def test_checklist_evidence_block_covers_shipping_and_tracking(self) -> None:
+        block = self.checklist[self.checklist.index("```markdown") : self.checklist.index("## Phase contract")]
+
+        for field in (
+            "Review verdicts:",
+            "Final smoke:",
+            "Branch and commit:",
+            "Pull request:",
+            "Tracker lines",
+        ):
+            with self.subTest(field=field):
+                self.assertIn(field, block)
+
+    def test_each_phase_names_its_sibling_skill(self) -> None:
+        blocks = phase_blocks(self.skill)
+        rows = {
+            line.split("|")[1].strip(): line.split("|")[2]
+            for line in self.checklist.splitlines()
+            if line.startswith("| ") and not line.startswith("| ---")
+        }
+
+        self.assertEqual(set(PHASES), set(PHASE_SKILLS))
+        for phase, names in PHASE_SKILLS.items():
+            for name in names:
+                with self.subTest(phase=phase, name=name):
+                    self.assertIn(f"`{name}`", blocks[phase])
+                    self.assertIn(f"`{name}`", rows[phase])
+        review = blocks["Architecture and adversarial review"]
+        self.assertLess(review.index("`architect-review`"), review.index("`adversarial-review`"))
+
+    def test_named_sibling_skills_exist_in_the_catalog(self) -> None:
+        catalog = json.loads((ROOT / "catalog.json").read_text(encoding="utf-8"))
+        names = {name for names in PHASE_SKILLS.values() for name in names} | {"orchestrator"}
+
+        for name in sorted(names):
+            with self.subTest(name=name):
+                self.assertTrue((ROOT / "skills" / name / "SKILL.md").is_file())
+                self.assertIn(name, catalog["skills"])
+
+    def test_contract_skills_name_no_removed_skill_or_agent(self) -> None:
+        combined = self.skill + self.checklist + self.tracker + self.fast_pr
+
+        for name in REMOVED_NAMES:
+            with self.subTest(name=name):
+                self.assertNotIn(f"`{name}`", combined)
+        self.assertNotIn("shipper", combined.lower())
+
+    def test_contract_files_fit_their_caps(self) -> None:
+        caps = {
+            "skills/delivery-loop/SKILL.md": (80, 7_000),
+            "skills/fast-pr-workflow/SKILL.md": (80, 7_000),
+            "skills/delivery-loop/references/delivery-checklist.md": (80, 6_000),
+            "skills/delivery-loop/references/tracker.md": (40, 6_000),
+        }
+
+        for relative, (max_lines, max_bytes) in caps.items():
+            path = ROOT / relative
+            with self.subTest(path=relative):
+                self.assertLessEqual(len(path.read_text(encoding="utf-8").splitlines()), max_lines)
+                self.assertLessEqual(path.stat().st_size, max_bytes)
+        for text in (self.skill, self.fast_pr):
+            with self.subTest(description=frontmatter_description(text)[:40]):
+                self.assertLessEqual(len(frontmatter_description(text)), 250)
 
     def test_validation_gate_checks_repository_before_editing(self) -> None:
         validation = self.skill[
@@ -95,14 +217,35 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("three repair cycles", combined)
         self.assertIn("diagnostic handoff", combined)
 
-    def test_pr_work_is_an_authorized_handoff(self) -> None:
+    def test_delivery_loop_owns_the_shipping_bundle(self) -> None:
         skill = self.skill.lower()
+        workflow = self.fast_pr.lower()
 
-        self.assertNotIn("**PR shipping**", self.skill)
-        self.assertIn("pr work is not a delivery phase", skill)
-        self.assertIn("after all required checks pass", skill)
-        self.assertIn("current request explicitly authorizes", skill)
-        self.assertIn("evidence, not authorization", self.fast_pr)
+        self.assertIn("**commit, push, and open pr**", skill)
+        self.assertIn("explicit request to run this delivery loop", skill)
+        self.assertIn("commit the completed diff", skill)
+        self.assertIn("create or update exactly one pull request", skill)
+        self.assertIn("never authorizes a merge", skill)
+        self.assertIn("explicit request to run `delivery-loop`", workflow)
+        self.assertIn("one topic-branch commit, push, and canonical pr", workflow)
+        self.assertIn("bundle never includes merge", workflow)
+        self.assertNotIn("PR work belongs to", frontmatter_description(self.skill))
+
+    def test_delivery_bundle_can_be_explicitly_narrowed(self) -> None:
+        combined = (self.skill + self.checklist + self.fast_pr).lower()
+
+        self.assertIn("do not push", combined)
+        self.assertIn("no pr", combined)
+        self.assertIn("explicit exclusion", combined)
+        self.assertIn("a pull request cannot proceed without a remote branch", combined)
+
+    def test_handoff_puts_the_pr_url_on_its_own_line(self) -> None:
+        handoff = section(self.skill, "Handoff")
+
+        self.assertIn("full pull-request URL on its own line", handoff)
+        self.assertIn("Merge remains separate", handoff)
+        self.assertIn("`tracker: none`", handoff)
+        self.assertIn("inbox: applied", handoff)
 
     def test_pr_workflow_scopes_each_mutating_action(self) -> None:
         workflow = self.fast_pr.lower()
@@ -132,6 +275,148 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("Optional durable state", combined)
         self.assertIn("does not add phases", combined)
         self.assertIn(".codex/delivery-state/", (ROOT / ".gitignore").read_text())
+
+    def test_skill_names_the_tracker_contract(self) -> None:
+        tracker_section = section(self.skill, "Task tracker (optional)")
+
+        for verb in TRACKER_VERBS:
+            with self.subTest(verb=verb):
+                self.assertIn(f"`{verb}`", tracker_section)
+        self.assertIn("~/.config/ai-skills/task-tracker", tracker_section)
+        self.assertIn("exit 3", tracker_section.lower())
+        self.assertIn("`tracker: none`", tracker_section)
+        self.assertIn("`Task: <ID>`", tracker_section)
+        self.assertIn("`skipped`", tracker_section)
+        self.assertIn("separately authorized merge", tracker_section)
+        self.assertIn("[references/tracker.md](references/tracker.md)", tracker_section)
+
+    def test_tracker_reference_documents_the_contract(self) -> None:
+        for verb in TRACKER_VERBS:
+            with self.subTest(verb=verb):
+                self.assertIn(f"| `{verb}`", self.tracker)
+        for flag in (
+            "--task ID",
+            "--product ROOT",
+            "--run-id RUN",
+            "--executor claude-code|codex",
+            "--dry-run",
+            "--landed",
+            "--limit",
+            "--packet",
+            "--phase",
+            "--outcome",
+            "--evidence",
+            "--next-gate",
+            "--pr",
+        ):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, self.tracker)
+        for word in (
+            "`intake`",
+            "`research`",
+            "`build`",
+            "`verify`",
+            "`shipping`",
+            "`complete`",
+            "`blocked`",
+            "`running`",
+            "`passed`",
+            "`failed`",
+            "`NEXT none`",
+            "`tracker: none`",
+            "`Task: <ID>`",
+            "Exit 3",
+            "`skipped`",
+            "360000",
+            "no interpreter prefix",
+            "`[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+`",
+            "`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`",
+            "never runs Git writes",
+        ):
+            with self.subTest(word=word):
+                self.assertIn(word, self.tracker)
+
+    def test_tracker_stub_answers_every_documented_call_shape(self) -> None:
+        stub = tracker_stub(self.tracker)
+        self.assertEqual(10, len(stub.splitlines()))
+        self.assertTrue(stub.startswith("#!/bin/sh\n"))
+
+        with tempfile.TemporaryDirectory() as home:
+            config = Path(home) / ".config/ai-skills"
+            config.mkdir(parents=True)
+            adapter = config / "task-tracker"
+            adapter.write_text(stub, encoding="utf-8")
+            adapter.chmod(0o755)
+            product = str(Path(home) / "product")
+            url = "https://github.com/OWNER/NAME/pull/7"
+            common = [
+                "--task", "ABC-12", "--product", product,
+                "--run-id", "run-1", "--executor", "claude-code",
+            ]
+            environment = {"HOME": home, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+
+            def call(*arguments: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [str(adapter), *arguments],
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=30,
+                    check=False,
+                )
+
+            listed = call("next", "--product", product, "--landed", "ABC-11", "--limit", "5")
+            self.assertEqual((0, "NEXT none\n"), (listed.returncode, listed.stdout))
+
+            writes = {
+                "claim": ["--packet", str(Path(home) / "packet.md")],
+                "checkpoint": [
+                    "--phase", "verify", "--outcome", "passed",
+                    "--evidence", "tests: 12 passed", "--next-gate", "review",
+                ],
+                "review": ["--pr", url, "--evidence", "head abc123"],
+                "finish": ["--pr", url, "--evidence", "merge abc123"],
+            }
+            for verb, extra in writes.items():
+                for dry_run in ([], ["--dry-run"]):
+                    with self.subTest(verb=verb, dry_run=bool(dry_run)):
+                        result = call(verb, *common, *extra, *dry_run)
+                        self.assertEqual(0, result.returncode)
+                        self.assertEqual([f"recorded {verb} ABC-12 run-1"], result.stdout.splitlines())
+
+            (config / "task-tracker.held").touch()
+            held = call("claim", *common)
+            self.assertEqual((3, "held ABC-12\n"), (held.returncode, held.stdout))
+            listed_while_held = call("next", "--product", product)
+            self.assertEqual((0, "NEXT none\n"), (listed_while_held.returncode, listed_while_held.stdout))
+
+            log = (config / "task-tracker.log").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(1 + 2 * len(writes) + 2, len(log))
+            self.assertTrue(log[0].startswith("next --product"))
+            self.assertIn("--run-id run-1", log[1])
+
+    def test_delivery_loop_points_several_packets_at_the_orchestrator(self) -> None:
+        self.assertIn("`orchestrator`", self.skill)
+        self.assertIn("never execute a packet's phases in your own context", self.skill)
+
+    def test_supervised_run_reads_inbox_and_halt(self) -> None:
+        supervised = section(self.skill, "Supervised run")
+
+        for phrase in (
+            "`<run dir>/INBOX.md`",
+            "every phase boundary",
+            "before shipping",
+            "numbered amendments",
+            "refuse and report",
+            "widens Git or publication authority",
+            "weakens a test",
+            "`STOP`",
+            "`<run dir>/HALT`",
+            "returns the checkpoint fields",
+            "conductor call the tracker",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, supervised)
 
     def test_pipeline_prompts_match_routing_fixtures(self) -> None:
         entries = public_registry()
@@ -430,32 +715,28 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertLess(content.index("architecture pass"), content.index("adversarial pass"))
         self.assertIn("last", content[content.index("adversarial pass") :])
 
-    def test_shipper_has_no_delivery_ownership_dependency(self) -> None:
-        content = (ROOT / "agents/shipper.md").read_text(encoding="utf-8")
+    def test_fast_pr_treats_handoffs_as_evidence(self) -> None:
+        self.assertNotIn("ownership epoch", self.fast_pr)
+        self.assertNotIn("sole-writer ownership", self.fast_pr)
+        self.assertIn("evidence, not authorization", self.fast_pr)
 
-        self.assertNotIn("ownership epoch", content)
-        self.assertNotIn("sole-writer ownership", content)
-        self.assertIn("evidence, not authority", content)
-
-    def test_shipper_derives_action_scope_before_remote_work(self) -> None:
-        content = (ROOT / "agents/shipper.md").read_text(encoding="utf-8")
-        scope = content.index("exact authorized action set")
-        remote = content.index("Fetch or query remote")
+    def test_fast_pr_derives_action_scope_before_remote_work(self) -> None:
+        scope = self.fast_pr.index("exact authorized action set")
+        remote = self.fast_pr.index("Fetch or query remote")
 
         self.assertLess(scope, remote)
         for action in ("`commit`", "`push`", "`PR create`", "`PR metadata update`", "`merge`"):
             with self.subTest(action=action):
-                self.assertIn(action, content)
-        self.assertIn("Authorization for one action does not authorize another", content)
-        self.assertIn("only for an authorized push, PR create, PR metadata update, or merge", content)
+                self.assertIn(action, self.fast_pr)
+        self.assertIn("Authorization for one does not imply any later action", self.fast_pr)
+        self.assertIn("only for an authorized push, PR create, PR metadata update, or merge", self.fast_pr)
 
-    def test_shipper_bounds_commit_only_and_metadata_only_actions(self) -> None:
-        content = (ROOT / "agents/shipper.md").read_text(encoding="utf-8")
-        commit_only = content[
-            content.index("For an authorized `commit`") : content.index("For an authorized `push`")
+    def test_fast_pr_bounds_commit_only_and_metadata_only_actions(self) -> None:
+        commit_only = self.fast_pr[
+            self.fast_pr.index("For an authorized **local commit**") : self.fast_pr.index("For an authorized **push**")
         ]
-        metadata_only = content[
-            content.index("For an authorized `PR metadata update`") : content.index("For an authorized `merge`")
+        metadata_only = self.fast_pr[
+            self.fast_pr.index("For an authorized **PR update**") : self.fast_pr.index("For an authorized **merge**")
         ]
 
         self.assertIn("If `commit` is the only authorized action", commit_only)
@@ -464,13 +745,41 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("change only the requested", metadata_only)
         self.assertIn("Do not stage, commit, or push repository files", metadata_only)
 
-    def test_shipper_verifies_remote_identity_after_remote_actions(self) -> None:
-        content = (ROOT / "agents/shipper.md").read_text(encoding="utf-8")
+    def test_fast_pr_verifies_remote_identity_after_remote_actions(self) -> None:
+        self.assertIn("After any remote action", self.fast_pr)
+        self.assertIn("local `HEAD`", self.fast_pr)
+        self.assertIn("remote branch head", self.fast_pr)
+        self.assertIn("PR head", self.fast_pr)
 
-        self.assertIn("After any remote action", content)
-        self.assertIn("local `HEAD`", content)
-        self.assertIn("remote branch head", content)
-        self.assertIn("PR head", content)
+    def test_fast_pr_stops_and_reports_a_stale_base(self) -> None:
+        self.assertIn(
+            "`gh api repos/{owner}/{repo}/compare/{base}...{headSha} --jq .behind_by`",
+            self.fast_pr,
+        )
+        self.assertIn("stop and report it", self.fast_pr)
+        self.assertIn("Syncing the branch is a separately authorized action", self.fast_pr)
+        self.assertNotIn("origin/<base>` into the head", self.fast_pr)
+
+    def test_fast_pr_keeps_the_protected_set_and_guard_override(self) -> None:
+        self.assertEqual(2, self.fast_pr.count("`main`, `master`, `develop`"))
+        self.assertNotIn("ordinary integration branches", self.fast_pr)
+        self.assertIn("mechanically enforced when the guard hooks are installed", self.fast_pr)
+        self.assertIn("`AI_SKILLS_ALLOW_PROTECTED=1`", self.fast_pr)
+        self.assertIn("`hooks/merge-guard.py`", self.fast_pr)
+        self.assertTrue((ROOT / "hooks/merge-guard.py").is_file())
+
+    def test_fast_pr_carries_no_account_facts(self) -> None:
+        workflow = self.fast_pr.lower()
+
+        for phrase in ("free plan", "403", "recovered lines", "this account", "private repos"):
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, workflow)
+
+    def test_fast_pr_reports_the_pr_url_on_its_own_line(self) -> None:
+        output = section(self.fast_pr, "Output to user")
+
+        self.assertIn("full PR URL on its own line", output)
+        self.assertIn("until merged", output)
 
     def test_helpers_are_directly_executable(self) -> None:
         for name in ("browser-suite-lease.py", "delivery-state.py"):
