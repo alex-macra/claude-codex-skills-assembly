@@ -5,6 +5,7 @@ from io import StringIO
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -860,6 +861,191 @@ class InstallerTests(unittest.TestCase):
             if "merge-guard.py" in item["command"]
         }
         self.assertEqual(list(timeouts.values()), [50])
+
+    def guard_overlay(self) -> tuple[Path, Path]:
+        catalog = self.overlay_catalog("guard-overlay")
+        guard = catalog.parent / "hooks" / "merge-guard.py"
+        guard.parent.mkdir()
+        guard.write_text(
+            (ROOT / "hooks" / "merge-guard.py").read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        data = json.loads(catalog.read_text(encoding="utf-8"))
+        data["hooks"] = {"mergeGuard": "hooks/merge-guard.py"}
+        catalog.write_text(json.dumps(data), encoding="utf-8")
+        return catalog, guard.resolve()
+
+    def installed_guard_commands(self, catalog: Path) -> list[str]:
+        result = self.run_main(
+            ["user", "--surface", "claude", "--catalog", str(catalog), "--hooks"]
+        )
+        self.assertEqual(result[0], 0, result)
+        settings = json.loads(
+            (Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "settings.json").read_text()
+        )
+        return [
+            item["command"]
+            for group in settings["hooks"]["PreToolUse"]
+            if group.get("matcher") == "Bash"
+            for item in group["hooks"]
+        ]
+
+    def run_guard_hook(self, command: str, payload: str) -> subprocess.CompletedProcess:
+        work = self.temp / "work"
+        if not work.exists():
+            init_repo(work)
+        return subprocess.run(
+            ["/bin/sh", "-c", command],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(work),
+            check=False,
+        )
+
+    @staticmethod
+    def bash_payload(command: object, cwd: str = "/srv/work", description: str = "") -> str:
+        return json.dumps(
+            {
+                "session_id": "sample",
+                "cwd": cwd,
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": command, "description": description},
+            }
+        )
+
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_merge_guard_hook_runs_the_guard_when_present(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+
+        denied = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+        allowed = self.run_guard_hook(command, self.bash_payload("git status --short"))
+
+        self.assertIn(str(guard), command)
+        self.assertEqual(denied.returncode, 0, denied.stderr)
+        reason = json.loads(denied.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("protected branch 'main'", reason)
+        self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_missing_merge_guard_blocks_only_git_gh_and_curl(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        guard.unlink()
+
+        blocked = (
+            self.bash_payload("git status"),
+            self.bash_payload("gh pr list"),
+            self.bash_payload("curl -X PUT https://api.example.invalid/pulls/1/merge"),
+            self.bash_payload("cd repo\ngit push origin main"),
+            self.bash_payload("echo ready && GIT push origin main"),
+            self.bash_payload("/usr/bin/git push origin main"),
+            self.bash_payload(["git", "push", "origin", "main"]),
+            "not json: git push origin main",
+        )
+        allowed = (
+            self.bash_payload("ls -la"),
+            self.bash_payload("python3 install.py user --hooks"),
+            self.bash_payload("cat .github/workflows/ci.yml && echo legit digits"),
+            self.bash_payload("ls", cwd="/srv/git/project", description="List git hooks"),
+            "not json at all",
+        )
+        for payload in blocked:
+            with self.subTest(blocked=payload):
+                result = self.run_guard_hook(command, payload)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"merge guard is missing: {guard}", result.stderr)
+        for payload in allowed:
+            with self.subTest(allowed=payload):
+                result = self.run_guard_hook(command, payload)
+                self.assertEqual((0, "", ""), (result.returncode, result.stdout, result.stderr))
+
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_failing_merge_guard_blocks_only_git_gh_and_curl(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        cases = {
+            "x = (\n": "failed (SyntaxError)",
+            "raise ImportError('missing dependency')\n": "failed (ImportError)",
+            "import sys\nsys.exit(1)\n": "exited with 1",
+            "": "failed (KeyError)",
+            "import sys\nsys.exit(0)\n": "exited without a verdict",
+            "def run_pretooluse():\n    return None\n": "returned no verdict",
+        }
+        for source, reason in cases.items():
+            guard.write_text(source, encoding="utf-8")
+            with self.subTest(guard=source):
+                blocked = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+                allowed = self.run_guard_hook(command, self.bash_payload("ls"))
+
+                self.assertEqual(blocked.returncode, 2, blocked.stderr)
+                self.assertIn(f"merge guard {reason}: {guard}", blocked.stderr)
+                self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_guard_without_its_main_block_still_gives_a_verdict(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        source = (ROOT / "hooks" / "merge-guard.py").read_text(encoding="utf-8")
+        guard.write_text(source[: source.index('if __name__ == "__main__"')], encoding="utf-8")
+
+        result = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            "deny", json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
+        )
+
+    @unittest.skipIf(
+        os.name == "nt" or os.geteuid() == 0, "permission mode test requires a non-root POSIX user"
+    )
+    def test_unreadable_merge_guard_blocks_only_git_gh_and_curl(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        guard.chmod(0)
+        self.addCleanup(guard.chmod, 0o644)
+
+        blocked = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+        allowed = self.run_guard_hook(command, self.bash_payload("ls"))
+
+        self.assertEqual(blocked.returncode, 2, blocked.stderr)
+        self.assertIn(f"merge guard failed (PermissionError): {guard}", blocked.stderr)
+        self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+    def test_previous_merge_guard_entry_is_replaced_once(self) -> None:
+        settings = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "settings.json"
+        settings.parent.mkdir(parents=True)
+        guard = ROOT / "hooks" / "merge-guard.py"
+        previous = shlex.join([str(installer.PYTHON), "-I", str(guard)])
+        settings.write_text(
+            json.dumps(
+                {
+                    "hooks": {
+                        "PreToolUse": [
+                            {
+                                "matcher": "Bash",
+                                "hooks": [{"type": "command", "command": previous, "timeout": 50}],
+                            }
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        commands = self.installed_guard_commands(ROOT / "catalog.json")
+        first = settings.read_text()
+        again = self.installed_guard_commands(ROOT / "catalog.json")
+
+        self.assertEqual(len(commands), 1, commands)
+        self.assertTrue(
+            commands[0].startswith(f"{shlex.quote(str(installer.PYTHON))} -I -c "), commands[0]
+        )
+        self.assertNotIn(previous, commands)
+        self.assertEqual(commands, again)
+        self.assertEqual(first, settings.read_text())
 
     def overlay_catalog(
         self,
