@@ -35,6 +35,18 @@ STATE_FILE = ".ai-skills-managed.json"
 STATE_DIRS = {"skills": "skills", "agents": "agents", "outputStyles": "output-styles"}
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PYTHON = Path(sys.executable).resolve(strict=False)
+MISSING_GUARD_CHECK = "\n".join(
+    (
+        "import json,re,sys",
+        't=sys.stdin.buffer.read().decode("utf-8","replace")',
+        'try:c=json.loads(t)["tool_input"]["command"]',
+        "except Exception:c=t",
+        "if not isinstance(c,str):c=t",
+        'if re.search(r"\\b(?:git|gh|curl)\\b",c,re.I):'
+        'sys.stderr.write("Blocked: merge guard is missing: "+sys.argv[1]+"\\n");'
+        "sys.exit(2)",
+    )
+)
 
 
 class InstallError(RuntimeError):
@@ -894,7 +906,11 @@ def hook_entry(catalogs: CatalogSet, spec: HookSpec) -> dict:
     catalog_value = os.pathsep.join(str(path) for path in catalogs.paths)
     interpreter = shlex.quote(str(PYTHON))
     if spec.key == "mergeGuard":
-        command = f"{interpreter} -I {shlex.quote(str(source))}"
+        guard = shlex.quote(str(source))
+        command = (
+            f"test -f {guard} && exec {interpreter} -I {guard} || "
+            f"exec {interpreter} -I -c {shlex.quote(MISSING_GUARD_CHECK)} {guard}"
+        )
     else:
         command = (
             f"test -f {shlex.quote(str(source))} && "

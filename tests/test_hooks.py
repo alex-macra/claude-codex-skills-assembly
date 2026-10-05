@@ -833,5 +833,117 @@ class MergeGuardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
 
 
+class MergeGuardCheckTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.temp = Path(temporary.name)
+        self.work = self.temp / "work"
+        self.work.mkdir()
+        subprocess.run(["git", "init", "-q", str(self.work)], check=True)
+
+    def check(self, *args: str, hooks: Path = HOOKS) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, "-I", "-B", "-S", str(hooks / "merge-guard-check.py"), *args],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(self.work),
+            check=False,
+        )
+
+    def hooks_with_policy(self, policy: str | None) -> Path:
+        hooks = self.temp / "hooks"
+        hooks.mkdir()
+        adapter = (HOOKS / "merge-guard-check.py").read_text(encoding="utf-8")
+        (hooks / "merge-guard-check.py").write_text(adapter, encoding="utf-8")
+        if policy is not None:
+            (hooks / "merge-guard.py").write_text(policy, encoding="utf-8")
+        return hooks
+
+    def test_allowed_commands_exit_zero_without_output(self) -> None:
+        for command in ("git status --short", "git push origin topic/example", "ls -la"):
+            with self.subTest(command=command):
+                result = self.check(command)
+                self.assertEqual((0, "", ""), (result.returncode, result.stdout, result.stderr))
+
+    def test_protected_push_is_denied_with_the_reason_on_stdout(self) -> None:
+        result = self.check("git push origin HEAD:refs/heads/main")
+
+        self.assertEqual(1, result.returncode, result.stderr)
+        self.assertIn("protected branch 'main'", result.stdout)
+        self.assertEqual("", result.stderr)
+
+    def test_decisions_and_reasons_match_the_pretooluse_hook(self) -> None:
+        commands = (
+            "git push origin main",
+            "git push origin topic/example",
+            "env git push origin main",
+            "AI_SKILLS_ALLOW_PROTECTED=1 git push origin main",
+            "echo ready\ngh pr merge 12 --admin",
+            "gh api -X PUT repos/example/widgets/pulls/12/merge",
+            "gh api repos/example/widgets/pulls/12/merge",
+            "MERGE='gh pr merge 12 --admin'; eval \"$MERGE\"",
+            "git config alias.ship 'push --no-verify'",
+            "echo 'git push origin main'",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                hook = subprocess.run(
+                    [sys.executable, str(HOOKS / "merge-guard.py")],
+                    input=json.dumps(
+                        {
+                            "tool_name": "Bash",
+                            "tool_input": {"command": command},
+                            "cwd": str(self.work),
+                        }
+                    ),
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(self.work),
+                    check=False,
+                )
+                self.assertEqual(0, hook.returncode, hook.stderr)
+                expected = (
+                    json.loads(hook.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+                    if hook.stdout.strip()
+                    else ""
+                )
+                result = self.check(command)
+                self.assertEqual((1 if expected else 0, expected), (result.returncode, result.stdout.strip()))
+
+    def test_missing_or_blank_command_prints_usage_and_allows(self) -> None:
+        for args in ((), ("  ",), ("git status", "extra")):
+            with self.subTest(args=args):
+                result = self.check(*args)
+                self.assertEqual(0, result.returncode)
+                self.assertIn("usage:", result.stderr)
+
+    def test_policy_crash_fails_closed(self) -> None:
+        hooks = self.hooks_with_policy("def run_pretooluse():\n    raise RuntimeError('boom')\n")
+
+        result = self.check("ls", hooks=hooks)
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("merge guard crashed (boom)", result.stderr)
+
+    def test_policy_nonzero_exit_fails_closed(self) -> None:
+        hooks = self.hooks_with_policy("import sys\n\ndef run_pretooluse():\n    sys.exit(2)\n")
+
+        result = self.check("ls", hooks=hooks)
+
+        self.assertEqual(1, result.returncode)
+        self.assertIn("merge guard exited with 2", result.stderr)
+
+    def test_missing_policy_fails_closed(self) -> None:
+        hooks = self.hooks_with_policy(None)
+
+        result = self.check("ls", hooks=hooks)
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual("", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
