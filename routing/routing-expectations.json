@@ -287,6 +287,19 @@
     ],
     "watch the loop and unblock it when it stalls": [
       "orchestrator"
+    ],
+    "how do I supervise a child process loop in python": [
+      "task-research",
+      "web-dev"
+    ],
+    "fix my crontab entry": [
+      "web-dev"
+    ],
+    "check these vulns": [
+      "security-review"
+    ],
+    "the mocks are stale": [
+      "qa-automation"
     ]
   },
   "negative": [
@@ -373,6 +386,13 @@
     "find the source of the force on the bridge deck",
     "summarize the specification for the billing rules",
     "draft a rapid capital budget for the quarter",
-    "the laundry dryer is broken again"
+    "the laundry dryer is broken again",
+    "this for loop is a long loop, can you make it faster",
+    "the event loop blocks; a continuous loop polls the socket",
+    "coordinate the loop variables in this function",
+    "consolidate the two config files",
+    "fix this regular expression",
+    "the secretary emailed me",
+    "summarize the latest contests"
   ]
 }

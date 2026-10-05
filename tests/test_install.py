@@ -1006,6 +1006,35 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("skills/extra-sample (dry run)", result[1])
         self.assertFalse((self.temp / "user").exists())
 
+    def many_extras(self, name: str, count: int, width: int = 16) -> Path:
+        directory = self.temp / name
+        for index in range(count):
+            skill = f"extra-listing-{index:02d}".ljust(width, "x")
+            (directory / skill).mkdir(parents=True)
+            (directory / skill / "SKILL.md").write_text(
+                f"---\nname: {skill}\ndescription: {'d' * 250}\n---\n", encoding="utf-8"
+            )
+        return directory
+
+    def test_extra_skills_count_against_the_listing_budget(self) -> None:
+        catalog = self.overlay_catalog("extra-listing")
+        cases = ((10, 0, "warning: selected skills with extras costs 2683"), (12, 2, "maximum is 3000"))
+        for count, code, expected in cases:
+            with self.subTest(count=count):
+                extras = self.many_extras(f"listing-{count}", count)
+                result = self.run_main(["user", "--catalog", str(catalog), "--extra-skills", str(extras), "--dry-run"])
+                self.assertEqual(result[0], code, result)
+                self.assertIn(expected, result[2])
+
+        public = self.run_main(
+            [
+                "user", "--surface", "claude", "--catalog", str(ROOT / "catalog.json"),
+                "--extra-skills", str(self.many_extras("listing-public", 1, width=64)), "--dry-run",
+            ]
+        )
+        self.assertEqual(public[0], 0, public)
+        self.assertIn("warning: selected skills with extras costs", public[2])
+
     def test_extra_skill_colliding_with_a_catalog_skill_is_refused(self) -> None:
         catalog = self.overlay_catalog("extra-collision")
         extras = self.extra_dir(skill="sample-only")

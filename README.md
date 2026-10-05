@@ -30,7 +30,7 @@ python3 install.py project /absolute/path/to/repo
 
 Both commands install the `default` profile on the Claude Code, OpenAI Codex, and Agents surfaces. Repeat `--surface` with `claude`, `codex`, or `agents` to limit surfaces. Use `--dry-run` to preview and `--uninstall` to remove managed entries. Installs are idempotent, preflight all targets, refuse unmanaged conflicts, back up modified settings and text files as numbered `.bak` files, and track ownership in `.ai-skills-managed.json`.
 
-`--extra-skills DIR` (repeatable) also links every subdirectory of `DIR` that holds a `SKILL.md`, for private skills kept outside any catalog. Each passes the catalog checks first: name matches its directory, description of at most 250 characters, the size caps, no unscoped `Bash` grant, no clash with a catalog skill, no symlinked skill directory, and `DIR` outside every catalog root. Extra skills get no routing rule, are never installed by default, and a later run without the flag removes them.
+`--extra-skills DIR` (repeatable) also links every subdirectory of `DIR` that holds a `SKILL.md`, for private skills kept outside any catalog. Each passes the catalog checks first: name matches its directory, description of at most 250 characters, the size caps, no unscoped `Bash` grant (an `allowed-tools` value the check cannot read also fails), no clash with a catalog skill, no symlink anywhere in the skill, and `DIR` outside every catalog root. Together with the selected profile they must fit the listing budget: the installer warns above 2,500 characters and refuses above 3,000. Extra skills get no routing rule, are never installed by default, and a later run without the flag removes them.
 
 ## Optional integrations
 
@@ -54,7 +54,7 @@ python3 install.py project /absolute/path/to/repo \
 
 Selected profiles are the complete desired set on selected surfaces. Pass every profile that should remain active. Plain `--uninstall` also removes installer-managed hooks and global rules without requiring their opt-in flags.
 
-The activation hook emits matching skill names from `routing/skill-rules.json`, fails open on malformed input, and never injects skill bodies. Keywords of four characters or fewer match whole words only. A prompt trigger can use `excludePatterns` to suppress its keyword and intent matches while leaving file-path activation available.
+The activation hook emits matching skill names from `routing/skill-rules.json`, fails open on malformed input, and never injects skill bodies. A keyword matches only where its alphanumeric edges meet word boundaries, with an optional suffix: `s` or `es`, plus `d`, `ed`, `ing`, `er`, or `ers` for keywords of five characters or more. A prompt trigger can use `excludePatterns` to suppress its keyword and intent matches while leaving file-path activation available.
 
 ## Delivery
 

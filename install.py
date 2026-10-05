@@ -1132,7 +1132,26 @@ def load_validator():
     return module
 
 
-def discover_extra_skills(directories: list[str], catalogs: CatalogSet) -> list[ExtraSkill]:
+def skill_description(validator, skill_dir: Path) -> str:
+    fields = validator.skill_frontmatter(skill_dir / "SKILL.md", [])
+    description = fields.get("description") if fields else None
+    return description if isinstance(description, str) else ""
+
+
+def check_extra_listing(validator, selected: Iterable[SourceEntry], extras: list[ExtraSkill]) -> None:
+    descriptions = {entry.name: skill_description(validator, entry.path) for entry in selected}
+    descriptions.update((extra.name, skill_description(validator, extra.path)) for extra in extras)
+    for item in validator.check_listing(descriptions, set(descriptions), label="selected skills with extras"):
+        if item.severity == "error":
+            raise InstallError(f"extra skills overflow the skill listing: {item.message}")
+        print(f"warning: {item.message}", file=sys.stderr)
+
+
+def discover_extra_skills(
+    directories: list[str],
+    catalogs: CatalogSet,
+    selected: Iterable[SourceEntry] = (),
+) -> list[ExtraSkill]:
     if not directories:
         return []
     validator = load_validator()
@@ -1158,6 +1177,7 @@ def discover_extra_skills(directories: list[str], catalogs: CatalogSet) -> list[
             extras[child.name] = ExtraSkill(child.name, child.resolve(strict=False))
         if not found:
             raise InstallError(f"no skill directories with SKILL.md in {directory}")
+    check_extra_listing(validator, selected, list(extras.values()))
     return list(extras.values())
 
 
@@ -1167,7 +1187,7 @@ def run_install(args: argparse.Namespace) -> int:
     profiles = args.profile or ["default"]
     selection = catalogs.select(profiles)
     if not args.uninstall:
-        selection.extras = discover_extra_skills(args.extra_skills, catalogs)
+        selection.extras = discover_extra_skills(args.extra_skills, catalogs, selection.skills)
     agent_surfaces = DEFAULT_AGENT_SURFACES if catalogs.agent_surfaces is None else catalogs.agent_surfaces
     actions = Actions(args.dry_run)
     migration_roots = [Path(path).expanduser().resolve(strict=False) for path in args.migrate_from]

@@ -31,7 +31,23 @@ MD_CAPS = {
     "markdown": (80, None),
 }
 BARE_BASH_GRANTS = {"Bash", "Bash(*)"}
-DANGLING_NAME_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)+)`\s*(?i:skills?|agents?)(?![\w-])")
+DANGLING_NAME_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)*)`\s*(?i:skills?|agents?)(?![\w-])")
+BACKTICKED_NAME_RE = re.compile(r"`([a-z0-9]+(?:-[a-z0-9]+)*)`")
+RETIRED_NAMES = frozenset(
+    {
+        "a11y-audit",
+        "automation",
+        "code-comments",
+        "code-reuse",
+        "e2e-qa",
+        "qa",
+        "shipper",
+        "web-dev-backend",
+        "web-dev-frontend",
+    }
+)
+YAML_UNCERTAIN_STARTS = tuple(">|&*!%@`{?")
+YAML_COMMENT_RE = re.compile(r"(?:^|\s)#")
 DENYLIST_ENV = "AI_SKILLS_DENYLIST"
 REQUIRED_GLOBAL_RULES = {"claude", "codex"}
 REQUIRED_HOOKS = {"activation", "mergeGuard", "usage"}
@@ -251,6 +267,8 @@ def skill_frontmatter(path: Path, findings: list[Finding]) -> dict[str, object] 
         if not separator or not key.strip():
             findings.append(finding("catalog", path, f"invalid frontmatter at line {line_number}"))
             continue
+        if key.strip() in fields:
+            findings.append(finding("catalog", path, f"repeated frontmatter key {key.strip()!r} at line {line_number}"))
         fields[key.strip()] = yaml_scalar(value)
 
     unknown = sorted(set(fields) - ALLOWED_FRONTMATTER)
@@ -320,6 +338,55 @@ def frontmatter_items(block: list[str], key: str) -> list[str]:
         if stripped.startswith("- "):
             items.append(stripped[2:].strip().strip("\"'"))
     return items
+
+
+def strip_yaml_comment(value: str) -> str:
+    match = YAML_COMMENT_RE.search(value)
+    return value[: match.start()] if match else value
+
+
+def top_level_key(line: str) -> str | None:
+    if not line or line[0].isspace() or line.startswith(("#", "-")):
+        return None
+    name, separator, _ = line.partition(":")
+    return name.strip() if separator else None
+
+
+def allowed_tools(block: list[str]) -> tuple[list[str], str | None]:
+    indexes = [index for index, line in enumerate(block) if top_level_key(line) == "allowed-tools"]
+    if not indexes:
+        return [], None
+    if len(indexes) > 1:
+        return [], "allowed-tools is repeated"
+    value = strip_yaml_comment(block[indexes[0]].partition(":")[2]).strip()
+    continuation: list[str] = []
+    for line in block[indexes[0] + 1 :]:
+        stripped = strip_yaml_comment(line).strip()
+        if not stripped:
+            continue
+        if not line[0].isspace() and not line.startswith("-"):
+            break
+        continuation.append(stripped)
+    if "\\" in value + "".join(continuation) and "\"" in value + "".join(continuation):
+        return [], "allowed-tools has an escaped double-quoted value"
+    if value:
+        if continuation:
+            return [], "allowed-tools spans several lines"
+        if value.startswith("["):
+            inner = value[1:-1]
+            if not value.endswith("]") or "[" in inner or "]" in inner:
+                return [], "allowed-tools has a flow list that does not close on its line"
+            return split_grants(inner), None
+        if value.startswith(YAML_UNCERTAIN_STARTS):
+            return [], f"allowed-tools starts with {value[0]!r}, which this check cannot read"
+        return split_grants(value), None
+    items: list[str] = []
+    for entry in continuation:
+        item = entry[2:].strip() if entry.startswith("- ") else ""
+        if not item or item.startswith(YAML_UNCERTAIN_STARTS + ("[", "-")):
+            return [], "allowed-tools has a line this check cannot read"
+        items.append(item.strip("\"'"))
+    return items, None
 
 
 def frontmatter_text(block: list[str], key: str) -> str | None:
@@ -910,16 +977,16 @@ def check_template_parity(root: Path) -> list[Finding]:
     return []
 
 
-def check_listing(descriptions: dict[str, str], profile: set[str]) -> list[Finding]:
+def check_listing(descriptions: dict[str, str], profile: set[str], label: str = "default profile") -> list[Finding]:
     total = sum(len(name) + len(descriptions.get(name, "")) for name in profile)
     if total > LISTING_FAIL_CHARS:
-        return [finding("listing", "catalog.json", f"default profile costs {total} characters; maximum is {LISTING_FAIL_CHARS}")]
+        return [finding("listing", "catalog.json", f"{label} costs {total} characters; maximum is {LISTING_FAIL_CHARS}")]
     if total > LISTING_WARN_CHARS:
         return [
             finding(
                 "listing",
                 "catalog.json",
-                f"default profile costs {total} characters; warning threshold is {LISTING_WARN_CHARS}",
+                f"{label} costs {total} characters; warning threshold is {LISTING_WARN_CHARS}",
                 severity="warning",
             )
         ]
@@ -1081,19 +1148,24 @@ def check_md_caps(root: Path, entries: list[Path], files: list[Path]) -> list[Fi
         relative = PurePosixPath(path.relative_to(root).as_posix())
         if path.is_file() and nested_reference(relative):
             findings.append(finding("caps", relative, "references must be one level deep"))
+        if path.is_symlink() and md_cap_kind(relative) not in {None, "markdown"}:
+            findings.append(finding("caps", relative, "must be a regular file, not a symlink"))
     for row in md_cap_rows(root, files):
         if not row.within:
             findings.append(finding("caps", row.path, cap_message(row)))
     return findings
 
 
-def bare_bash_grants(skill_md: Path) -> list[str]:
+def bash_grant_problems(skill_md: Path) -> list[str]:
     block = frontmatter_block(skill_md)
     if block is None:
         return []
+    grants, problem = allowed_tools(block)
+    if problem is not None:
+        return [problem]
     return [
-        grant
-        for grant in frontmatter_items(block, "allowed-tools")
+        f"allowed-tools grants unscoped {grant}"
+        for grant in grants
         if "".join(grant.split()) in BARE_BASH_GRANTS
     ]
 
@@ -1104,10 +1176,8 @@ def check_no_bare_bash(root: Path, files: list[Path]) -> list[Finding]:
         parts = path.relative_to(root).parts
         if len(parts) != 3 or parts[0] != "skills" or parts[2] != "SKILL.md":
             continue
-        for grant in bare_bash_grants(path):
-            findings.append(
-                finding("permissions", path.relative_to(root), f"allowed-tools grants unscoped {grant}")
-            )
+        for problem in bash_grant_problems(path):
+            findings.append(finding("permissions", path.relative_to(root), problem))
     return findings
 
 
@@ -1125,11 +1195,17 @@ def declared_names(root: Path) -> set[str]:
 
 
 def dangling_names(text: str, known: set[str]) -> list[tuple[int, str]]:
-    return [
+    found = {
         (text.count("\n", 0, match.start()) + 1, match.group(1))
         for match in DANGLING_NAME_RE.finditer(text)
         if match.group(1) not in known
-    ]
+    }
+    found.update(
+        (text.count("\n", 0, match.start()) + 1, match.group(1))
+        for match in BACKTICKED_NAME_RE.finditer(text)
+        if match.group(1) in RETIRED_NAMES and match.group(1) not in known
+    )
+    return sorted(found)
 
 
 def names_prose(relative: PurePosixPath) -> bool:
@@ -1203,13 +1279,6 @@ def check_denylist(root: Path, entries: list[Path], files: list[Path], denylist:
     return findings
 
 
-def link_stays_within(link: Path, root: Path) -> bool:
-    try:
-        return is_within(link.resolve(strict=True), root)
-    except (OSError, RuntimeError):
-        return False
-
-
 def check_extra_skill(
     path: Path,
     reserved: Iterable[str] = (),
@@ -1240,19 +1309,19 @@ def check_extra_skill(
         description = fields.get("description")
         if not isinstance(description, str) or not 1 <= len(description) <= DESCRIPTION_MAX_CHARS:
             problems.append(f"{name}: description must be 1-{DESCRIPTION_MAX_CHARS} characters")
-    problems.extend(f"{name}: allowed-tools grants unscoped {grant}" for grant in bare_bash_grants(skill_md))
+    problems.extend(f"{name}: {problem}" for problem in bash_grant_problems(skill_md))
     for current, directories, filenames in os.walk(path):
-        directories[:] = sorted(item for item in directories if item not in EXCLUDED_PARTS)
+        directories.sort()
         for item in directories + sorted(filenames):
             candidate = Path(current) / item
             inner = PurePosixPath("skills", name, *candidate.relative_to(path).parts)
-            if candidate.is_symlink() and not link_stays_within(candidate, resolved):
-                problems.append(f"{name}: {inner.as_posix()} is a symlink that escapes the skill")
+            if candidate.is_symlink():
+                problems.append(f"{name}: {inner.as_posix()} is a symlink; extra skills hold regular files only")
                 continue
             if candidate.is_file() and nested_reference(inner):
                 problems.append(f"{name}: {inner.as_posix()} nests references more than one level deep")
             kind = md_cap_kind(inner, frozenset())
-            if kind is None or not candidate.is_file() or candidate.is_symlink():
+            if kind is None or not candidate.is_file():
                 continue
             row = cap_row(candidate, inner, kind)
             if row is not None and not row.within:

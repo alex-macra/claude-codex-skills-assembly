@@ -16,7 +16,7 @@ Skills stick to agentskills.io-standard frontmatter fields so they stay portable
 ## Tool grants and names
 
 - Scope every `allowed-tools` grant, such as `Bash(git status:*)`. A bare `Bash` or `Bash(*)` fails validation.
-- Name a skill or agent in prose only when `catalog.json` declares it. The validator checks each backticked hyphenated name followed by the word skill or agent.
+- Name a skill or agent in prose only when `catalog.json` declares it. The validator checks each backticked name followed by the word skill or agent, and fails a retired skill or agent name anywhere in backticks.
 
 ## Size caps
 

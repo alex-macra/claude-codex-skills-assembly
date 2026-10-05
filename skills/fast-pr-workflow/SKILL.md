@@ -18,7 +18,7 @@ Perform only the authorized Git and PR mechanics, without disturbing unrelated w
 
 - The only shipping actions are `commit`, `push`, `PR create`, `PR metadata update`, and `merge`. Resolve the exact authorized action set from the current request before inspecting or mutating anything, and stop after the last one: `commit these changes locally` is not a push, and `update the PR body` is not a commit.
 - General requests to ship, release, finish, approve, or synchronize work do not authorize an unrequested commit, push, PR creation or update, protected-branch action, or merge.
-- A task packet or delivery handoff is evidence, not authorization. An explicit request to run `delivery-loop` is the narrow exception: after its checks, reviews, and smoke pass, it authorizes one topic-branch commit, push, and canonical PR create or update unless the user excludes an action. The bundle never includes merge.
+- A task packet or delivery handoff is evidence, not authorization. An explicit request to run `delivery-loop`, or the `orchestrator` on named packets or a tracker queue, is the narrow exception: after its checks, reviews, and smoke pass, it authorizes one topic-branch commit, push, and canonical PR create or update per task unless the user excludes an action; a conductor landing a builder commit under that request uses it too. The bundle never includes merge.
 - Outside that bundle, commit, push, PR create, PR update, and merge are separate actions. Authorization for one does not imply any later action.
 - Creating a PR includes the minimum push of the already-validated, non-protected topic-branch `HEAD` needed to make that PR exist. It does not authorize creating another commit. Updating PR metadata does not authorize any new commit or push.
 
@@ -29,8 +29,8 @@ Perform only the authorized Git and PR mechanics, without disturbing unrelated w
 - Merge only a head current with its base: if `gh api repos/{owner}/{repo}/compare/{base}...{headSha} --jq .behind_by` is non-zero, a stale first parent can silently drop content, so stop and report it. Syncing the branch is a separately authorized action.
 - These rules are mechanically enforced when the guard hooks are installed (`hooks/merge-guard.py`): a protected-branch push, a stale-base merge, or `gh pr merge --admin` fails. Never bypass the guard, branch protection, or required checks; if the user truly asked for it, prefix the command with `AI_SKILLS_ALLOW_PROTECTED=1` so the decision is visible.
 - Do not merge branches, create merge commits, rebase, squash, or push merge results unless the user explicitly asks for that exact operation.
-- Never commit secrets, env files, caches, build artifacts, or unrelated generated output; prefer one focused commit per task and reuse existing branches and PRs.
-- The scoped `allowed-tools` inventory is approved for routine branch-to-PR loops on a disposable or independently backed-up controller. Permission matching includes output redirections, so even an allowed inspection command can overwrite a local file. Git does not protect uncommitted files or credentials.
+- Never commit secrets, env files, caches, build artifacts, or unrelated generated output; prefer one focused commit per task.
+- The scoped `allowed-tools` inventory is approved for branch-to-PR loops on a disposable or independently backed-up controller. Permission matching includes output redirections, so even an allowed inspection command can overwrite a local file. Git does not protect uncommitted files or credentials.
 - Action-prefix grants can accept later flags, so the permission engine is not an argument sandbox. Use only the listed command shapes without force-push flags, hook-bypass flags, cross-repository flags, non-`HEAD` push refspecs, reset, clean, branch deletion, PR merge, close, or review. Do not request or persist broader Git, GitHub CLI, or Bash grants.
 
 ## Workflow

@@ -28,6 +28,8 @@ MAX_PROMPT_SCOPES = 32
 MAX_REGEX_REPEAT = 1_000
 REGEX_TIMEOUT_SECONDS = 0.02
 SHORT_KEYWORD_MAX_CHARS = 4
+SHORT_KEYWORD_SUFFIX = r"(?:s|es)?"
+KEYWORD_SUFFIX = r"(?:s|es|d|ed|ing|er|ers)?"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CATALOG = REPO_ROOT / "catalog.json"
@@ -263,10 +265,13 @@ def available_skills() -> set[str]:
 
 def matches_keyword(prompt_lc: str, keyword: str) -> bool:
     needle = keyword.lower()
-    if not 0 < len(needle) <= SHORT_KEYWORD_MAX_CHARS:
-        return needle in prompt_lc
+    if not needle:
+        return False
     before = r"(?<![a-z0-9])" if needle[0].isalnum() else ""
-    after = r"(?![a-z0-9])" if needle[-1].isalnum() else ""
+    after = ""
+    if needle[-1].isalnum():
+        suffix = SHORT_KEYWORD_SUFFIX if len(needle) <= SHORT_KEYWORD_MAX_CHARS else KEYWORD_SUFFIX
+        after = suffix + r"(?![a-z0-9])"
     return re.search(before + re.escape(needle) + after, prompt_lc) is not None
 
 

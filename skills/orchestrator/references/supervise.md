@@ -5,8 +5,8 @@ How the orchestrator watches work it did not do: a loop in this session, one who
 ## Discovery
 
 - Claude Code: `ListAgents` lists in-process subagents, teammates and other local sessions; `claude agents` lists background agents; run directories under `~/.local/state/ai-skills/orchestrator/*/STATE.md` name the runs on this machine.
-- Codex: assume no cross-session primitive. Supervise through `STATE.md` and `INBOX.md` in the run directory the brief names.
-- A session without a run directory gets one from you before the first probe and is told its path in the first message or brief.
+- Codex: assume no cross-session primitive. Supervise through `STATE.md` and `INBOX.md` in the run directory, which the loop finds as below.
+- A session without a run directory gets one from you before the first probe. Write the line `Worktree: <path>` into its `STATE.md` header, with the path its `git rev-parse --show-toplevel` prints: a `delivery-loop` checks `~/.local/state/ai-skills/orchestrator/*/STATE.md` for that line at every phase boundary, so it finds `INBOX.md` and `HALT` with no message channel. Also tell it the path where a channel exists. Delete the line at handoff so a later loop in the same worktree does not read a finished run.
 
 ## Check-in probe
 

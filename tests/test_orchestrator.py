@@ -13,6 +13,15 @@ CONDUCT_MD = SKILL_DIR / "references/conduct.md"
 AGENTS_DIR = ROOT / "agents"
 ORCHESTRATOR_AGENT = AGENTS_DIR / "orchestrator.md"
 REVIEWER_AGENT = AGENTS_DIR / "reviewer.md"
+DELIVERY_MD = ROOT / "skills/delivery-loop/SKILL.md"
+CHECKLIST_MD = ROOT / "skills/delivery-loop/references/delivery-checklist.md"
+TRACKER_MD = ROOT / "skills/delivery-loop/references/tracker.md"
+FAST_PR_MD = ROOT / "skills/fast-pr-workflow/SKILL.md"
+WRITE_SCOPE = (
+    "Watching a session you did not start, write only the run directory. Conducting your own builders, you may also "
+    "create task worktrees, fast-forward the rolling branch, push it, and open or update the PR through "
+    "`fast-pr-workflow`; never edit product files."
+)
 U3_FILES = (SKILL_MD, SUPERVISE_MD, CONDUCT_MD, ORCHESTRATOR_AGENT, REVIEWER_AGENT)
 DASHES_RE = re.compile("[" + chr(0x2013) + chr(0x2014) + "]")
 
@@ -46,6 +55,12 @@ def frontmatter(path: Path) -> dict[str, object]:
 
 def ordered(haystack: str, *needles: str) -> list[int]:
     return [haystack.index(needle) for needle in needles]
+
+
+def section(text: str, heading: str) -> str:
+    start = text.index(f"\n## {heading}\n")
+    end = text.find("\n## ", start + 1)
+    return text[start : end if end != -1 else len(text)]
 
 
 class OrchestratorSkillTests(unittest.TestCase):
@@ -136,6 +151,67 @@ class OrchestratorSkillTests(unittest.TestCase):
         self.assertIn("## STATE.md", content)
 
 
+    def test_write_scope_depends_on_the_mode(self) -> None:
+        for path in (SKILL_MD, ORCHESTRATOR_AGENT):
+            with self.subTest(path=path.name):
+                self.assertIn(WRITE_SCOPE, read(path))
+        self.assertNotIn("run directory only", self.lower)
+        self.assertNotIn("run directory only", read(ORCHESTRATOR_AGENT).lower())
+
+    def test_conductor_claims_before_dispatch(self) -> None:
+        conduct = read(CONDUCT_MD)
+        claim = section(conduct, "Claim before dispatch")
+        positions = ordered(conduct, "## Worktree and re-pin", "## Claim before dispatch", "## Landing")
+
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("after `REPIN ok`", claim)
+        self.assertIn("`claim --packet <file>` before dispatch", claim)
+        self.assertIn("Exit 3: do not dispatch", claim)
+        self.assertIn("never dispatch an unclaimed tracked task", claim)
+        self.assertIn("the task's run ID", section(conduct, "Brief and return"))
+        self.assertIn("under a conductor, by the conductor before dispatch", read(TRACKER_MD))
+        self.assertIn(
+            "`claim` after `READY`, before the first write, unless your conductor claimed before dispatch",
+            read(DELIVERY_MD),
+        )
+        self.assertIn("unless its conductor claimed before dispatch", read(CHECKLIST_MD))
+
+    def test_fast_pr_bundle_covers_an_explicit_orchestrator_run(self) -> None:
+        self.assertIn(
+            "An explicit request to run `delivery-loop`, or the `orchestrator` on named packets or a tracker queue, "
+            "is the narrow exception",
+            read(FAST_PR_MD),
+        )
+
+    def test_loops_find_their_run_directory_by_worktree(self) -> None:
+        supervised = section(read(DELIVERY_MD), "Supervised run")
+        discovery = section(read(SUPERVISE_MD), "Discovery")
+
+        for phrase in (
+            "At every phase boundary and before shipping, find your run directory",
+            "`~/.local/state/ai-skills/orchestrator/*/`",
+            "the line `Worktree: <path>`",
+            "`git rev-parse --show-toplevel`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, supervised)
+        for phrase in (
+            "`Worktree: <path>`",
+            "`~/.local/state/ai-skills/orchestrator/*/STATE.md`",
+            "with no message channel",
+            "Delete the line at handoff",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, discovery)
+        self.assertIn("`Worktree: <path>`", self.skill)
+        self.assertIn("`Worktree: <path>`", section(read(CONDUCT_MD), "STATE.md"))
+
+    def test_a_skipped_next_is_not_an_empty_queue(self) -> None:
+        self.assertIn("A `skipped` line is not an empty queue", self.skill)
+        self.assertIn("stop without the milestone gate", section(read(CONDUCT_MD), "Next task"))
+        self.assertIn("which is never an empty queue", read(TRACKER_MD))
+
+
 class AgentTests(unittest.TestCase):
     def test_orchestrator_agent_preloads_exactly_orchestrator(self) -> None:
         fields = frontmatter(ORCHESTRATOR_AGENT)
@@ -145,7 +221,7 @@ class AgentTests(unittest.TestCase):
         self.assertIn("maxTurns", fields)
         self.assertLessEqual(len(fields["description"]), 250)
         content = read(ORCHESTRATOR_AGENT).lower()
-        self.assertIn("run directory only", content)
+        self.assertIn("write only the run directory", content)
         self.assertIn("never edit the watched session's tree", content)
         self.assertIn("never merge", content)
 

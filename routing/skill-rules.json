@@ -222,7 +222,6 @@
           "run the orchestrator",
           "orchestrate the delivery",
           "orchestrate delivery",
-          "long loop",
           "keep the loop going",
           "milestone after milestone",
           "oversee the delivery",
@@ -232,11 +231,12 @@
           "watch the loop"
         ],
         "intentPatterns": [
-          "(?is)\\b(?:orchestrate|oversee|coordinate|supervise)\\b[^.;\\n]{0,80}\\b(?:delivery|loop|agents|workers|milestone)s?\\b",
-          "(?is)\\b(?:long|rolling|continuous|autonomous)\\s+(?:delivery\\s+)?loop\\b",
+          "(?is)\\b(?:orchestrate|oversee|coordinate|supervise)\\b[^.;\\n]{0,80}\\b(?:delivery|packets?|milestones?|sessions?|agents)\\b",
+          "(?is)\\b(?:long|rolling|continuous|autonomous)\\s+delivery\\s+loop\\b",
+          "(?is)\\b(?:long|rolling|continuous|autonomous)\\s+loop\\b[^.;\\n]{0,80}\\b(?:milestones?|packets?)\\b",
           "(?is)\\bkeep\\s+(?:the\\s+)?(?:loop|delivery|train)\\s+going\\b",
           "(?is)\\bmilestone\\s+after\\s+milestone\\b",
-          "(?is)\\b(?:supervise|oversee|watch\\s+over)\\b[^.;\\n]{0,40}\\b(?:sessions?|loop)\\b"
+          "(?is)\\b(?:supervise|oversee|watch\\s+over)\\b[^.;\\n]{0,40}\\b(?:sessions?|delivery\\s+loop)\\b"
         ],
         "excludePatterns": [
           "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|should not|cannot|can't|won't|must not)\\b[^.;\\n]{0,60}\\b(?:orchestrate|oversee|coordinate|supervise|watch)\\b[^.;\\n]*(?=[.;\\n]|\\Z)",
@@ -539,6 +539,7 @@
           "image",
           "registry",
           "cron",
+          "crontab",
           "schedule",
           "scheduled job",
           "systemd timer",

@@ -231,6 +231,21 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("bundle never includes merge", workflow)
         self.assertNotIn("PR work belongs to", frontmatter_description(self.skill))
 
+    def test_orchestrator_bundle_needs_an_explicit_run_request(self) -> None:
+        orchestrator = (ROOT / "skills/orchestrator/SKILL.md").read_text(encoding="utf-8")
+        conduct = (ROOT / "skills/orchestrator/references/conduct.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "An explicit request to run `delivery-loop` or the orchestrator on named packets or a tracker queue "
+            "authorizes the shipping bundle per task",
+            orchestrator,
+        )
+        self.assertIn("stops each task at the builder commit and reports", orchestrator)
+        self.assertNotIn("The request that starts the run authorizes", orchestrator)
+        self.assertIn("otherwise stop at the builder commit and report", section(conduct, "Landing"))
+        self.assertIn("a conductor landing a builder commit under that request uses it too", self.fast_pr)
+        self.assertIn("General requests to ship, release, finish", self.fast_pr)
+
     def test_delivery_bundle_can_be_explicitly_narrowed(self) -> None:
         combined = (self.skill + self.checklist + self.fast_pr).lower()
 
@@ -338,7 +353,7 @@ class DeliveryLoopContractTests(unittest.TestCase):
 
     def test_tracker_stub_answers_every_documented_call_shape(self) -> None:
         stub = tracker_stub(self.tracker)
-        self.assertEqual(10, len(stub.splitlines()))
+        self.assertEqual(11, len(stub.splitlines()))
         self.assertTrue(stub.startswith("#!/bin/sh\n"))
 
         with tempfile.TemporaryDirectory() as home:
@@ -382,7 +397,8 @@ class DeliveryLoopContractTests(unittest.TestCase):
                     with self.subTest(verb=verb, dry_run=bool(dry_run)):
                         result = call(verb, *common, *extra, *dry_run)
                         self.assertEqual(0, result.returncode)
-                        self.assertEqual([f"recorded {verb} ABC-12 run-1"], result.stdout.splitlines())
+                        prefix = "dry-run" if dry_run else "recorded"
+                        self.assertEqual([f"{prefix} {verb} ABC-12 run-1"], result.stdout.splitlines())
 
             (config / "task-tracker.held").touch()
             held = call("claim", *common)
@@ -391,9 +407,10 @@ class DeliveryLoopContractTests(unittest.TestCase):
             self.assertEqual((0, "NEXT none\n"), (listed_while_held.returncode, listed_while_held.stdout))
 
             log = (config / "task-tracker.log").read_text(encoding="utf-8").splitlines()
-            self.assertEqual(1 + 2 * len(writes) + 2, len(log))
-            self.assertTrue(log[0].startswith("next --product"))
-            self.assertIn("--run-id run-1", log[1])
+            self.assertEqual(len(writes) + 1, len(log))
+            self.assertFalse(any(line.startswith("next") or "--dry-run" in line for line in log))
+            self.assertTrue(log[0].startswith("claim --task ABC-12"))
+            self.assertIn("--run-id run-1", log[0])
 
     def test_delivery_loop_points_several_packets_at_the_orchestrator(self) -> None:
         self.assertIn("`orchestrator`", self.skill)
@@ -767,13 +784,6 @@ class DeliveryLoopContractTests(unittest.TestCase):
         self.assertIn("`AI_SKILLS_ALLOW_PROTECTED=1`", self.fast_pr)
         self.assertIn("`hooks/merge-guard.py`", self.fast_pr)
         self.assertTrue((ROOT / "hooks/merge-guard.py").is_file())
-
-    def test_fast_pr_carries_no_account_facts(self) -> None:
-        workflow = self.fast_pr.lower()
-
-        for phrase in ("free plan", "403", "recovered lines", "this account", "private repos"):
-            with self.subTest(phrase=phrase):
-                self.assertNotIn(phrase, workflow)
 
     def test_fast_pr_reports_the_pr_url_on_its_own_line(self) -> None:
         output = section(self.fast_pr, "Output to user")

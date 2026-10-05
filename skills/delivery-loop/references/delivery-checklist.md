@@ -41,7 +41,7 @@ The eight rows below are the complete delivery phase sequence. Keep the evidence
 - Confirm one writable repository and delivery history, exact read and write sets, and a collision-safe retry path. Classify each command as current-state or post-change proof; run safe preflight.
 - Bind tools and credentials to explicit provenance and least privilege; capability is not authorization. Reject unprovenanced ambient installs and implicit cross-job state.
 - Require every section: Readiness, Objective, Why, Scope, Starting point, Decisions already made, Decision authority, Contract, Change required, Invariants, Non-goals, Acceptance, Verify, Escalate, Handoff; one that does not apply says `Not applicable - <reason>`. Run a validator named in Verify; structural green never replaces evidence checks.
-- Only the packet's readiness controls the loop; tracker status is informational. `READY` needs a clean or isolated state. Stop before editing on `BLOCKED_BY_SPEC`. On `NO_CHANGE_NEEDED`, prove every acceptance case end to end and stop without an empty commit, push, or PR. A tracked task runs `claim` after `READY`.
+- Only the packet's readiness controls the loop; tracker status is informational. `READY` needs a clean or isolated state. Stop before editing on `BLOCKED_BY_SPEC`. On `NO_CHANGE_NEEDED`, prove every acceptance case end to end and stop without an empty commit, push, or PR. A tracked task runs `claim` after `READY` unless its conductor claimed before dispatch.
 
 ## 2. Implement
 

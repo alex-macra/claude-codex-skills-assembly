@@ -26,6 +26,14 @@ def numbered_lines(count: int, width: int = 1) -> str:
     return "".join(f"{'x' * width}\n" for _ in range(count))
 
 
+UNSCOPED_BASH_FORMS = {
+    "comment": "allowed-tools:\n  - Bash # everything\n",
+    "flow": "allowed-tools: [Read,\n  Bash]\n",
+    "folded": "allowed-tools: >\n  Bash\n",
+    "repeated": "allowed-tools: Read\nallowed-tools: Bash\n",
+}
+
+
 def skill_text(name: str, total_lines: int, width: int = 1, extra_frontmatter: str = "") -> str:
     header = f'---\nname: {name}\ndescription: "Reusable sample skill."\nlicense: MIT\n{extra_frontmatter}---\n'
     return header + numbered_lines(total_lines - header.count("\n"), width)
@@ -434,6 +442,8 @@ class ValidatorTests(unittest.TestCase):
             ("allowed-tools:\n  - Read\n  - Bash\n", True),
             ("allowed-tools: Bash(git status:*), Bash(git diff:*) Read\n", False),
             ("allowed-tools: Bash(git log --oneline)\n", False),
+            ("allowed-tools:\n  - Read # read only\n", False),
+            *((form, True) for form in UNSCOPED_BASH_FORMS.values()),
         )
         for frontmatter, rejected in cases:
             with self.subTest(frontmatter=frontmatter):
@@ -449,6 +459,36 @@ class ValidatorTests(unittest.TestCase):
         findings = self.errors_for("names")
         self.assertEqual({"templates/CLAUDE.md", "templates/AGENTS.md", "agents/helper.md"}, {item.path for item in findings})
         self.assertTrue(any("'code-comments'" in item.message and "line 1" in item.message for item in findings))
+
+    def test_single_word_and_retired_names_are_reported(self) -> None:
+        line = (
+            "Hand off to the `shipper` agent, then the `qa` agent, then the `e2e-qa` skill, then load `code-reuse`.\n"
+            "Ask the `helper` agent; `automation` was retired.\n"
+        )
+        self.write(f"skills/{SKILL_NAMES[0]}/SKILL.md", skill_text(SKILL_NAMES[0], 8) + line)
+
+        names = {item.message.split("'")[1] for item in self.errors_for("names")}
+
+        self.assertEqual({"shipper", "qa", "e2e-qa", "code-reuse", "automation"}, names)
+
+    def test_symlinked_capped_markdown_is_rejected(self) -> None:
+        name = SKILL_NAMES[0]
+        self.write("docs/see.md", skill_text(name, 65, extra_frontmatter="allowed-tools: Bash\n"))
+        self.write(f"skills/{SKILL_NAMES[1]}/references/real.md", "# Real\n")
+        self.write("docs/agent.md", "---\nname: helper\ndescription: Helper.\n---\n")
+        links = {
+            f"skills/{name}/SKILL.md": Path("../../docs/see.md"),
+            f"skills/{SKILL_NAMES[1]}/references/linked.md": Path("real.md"),
+            "agents/helper.md": Path("../docs/agent.md"),
+        }
+        for relative, target in links.items():
+            path = self.root / relative
+            path.unlink(missing_ok=True)
+            path.symlink_to(target)
+
+        caps = {item.path for item in self.errors_for("caps") if "regular file" in item.message}
+
+        self.assertEqual(set(links), caps)
 
     def test_dangling_name_check_ignores_keys_paths_and_known_names(self) -> None:
         self.add_catalog_skill("delivery-loop")
@@ -536,11 +576,57 @@ class ValidatorTests(unittest.TestCase):
             "symlink": (linked, "must not be a symlink"),
             "frontmatter": (make("extra-six", "no frontmatter\n"), "missing YAML frontmatter"),
             "inside": (self.root / "skills" / SKILL_NAMES[1], "inside a catalog root"),
+            **{
+                f"bash-{label}": (
+                    make(f"extra-bash-{label}", skill_text(f"extra-bash-{label}", 10, extra_frontmatter=form)),
+                    "allowed-tools",
+                )
+                for label, form in UNSCOPED_BASH_FORMS.items()
+            },
         }
         for label, (path, expected) in cases.items():
             with self.subTest(case=label):
                 problems = validator.check_extra_skill(path, set(SKILL_NAMES) - {SKILL_NAMES[1]}, [self.root])
                 self.assertTrue(any(expected in problem for problem in problems), problems)
+
+    def test_extra_skill_symlinks_are_rejected_wherever_they_sit(self) -> None:
+        holder = tempfile.TemporaryDirectory()
+        self.addCleanup(holder.cleanup)
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        secret = Path(outside.name) / "secret.txt"
+        secret.write_text("outside\n", encoding="utf-8")
+
+        def make(name: str) -> Path:
+            path = Path(holder.name) / name
+            path.mkdir()
+            (path / "SKILL.md").write_text(skill_text(name, 10), encoding="utf-8")
+            return path
+
+        cases = {
+            "node_modules": (make("esc-modules"), "node_modules", Path(outside.name)),
+            ".venv": (make("esc-venv"), ".venv", Path(outside.name)),
+            "nested": (make("esc-nested"), "big/node_modules/p", secret),
+            "inside": (make("esc-inside"), "notes.md", Path("SKILL.md")),
+        }
+        for label, (skill, relative, target) in cases.items():
+            link = skill / relative
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(target)
+            with self.subTest(case=label):
+                problems = validator.check_extra_skill(skill, set(SKILL_NAMES), [self.root])
+                self.assertTrue(any(f"{relative} is a symlink" in problem for problem in problems), problems)
+
+        hidden = make("esc-hidden-markdown")
+        (hidden / "node_modules").mkdir()
+        (hidden / "node_modules" / "long.md").write_text("x\n" * 81, encoding="utf-8")
+        problems = validator.check_extra_skill(hidden, set(SKILL_NAMES), [self.root])
+        self.assertTrue(any("node_modules/long.md" in problem and "exceed the cap" in problem for problem in problems))
+
+    def test_listing_label_names_what_was_measured(self) -> None:
+        findings = validator.check_listing({"a": "x" * 3_000}, {"a"}, label="selected skills with extras")
+
+        self.assertEqual(["selected skills with extras costs 3001 characters; maximum is 3000"], [item.message for item in findings])
 
     def test_repo_meets_md_caps(self) -> None:
         entries = validator.repo_entries(SOURCE_ROOT)
