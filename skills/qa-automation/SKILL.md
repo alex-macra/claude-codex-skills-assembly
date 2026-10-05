@@ -1,84 +1,56 @@
 ---
 name: qa-automation
-description: "Writing and running automated tests: unit and integration design, fixtures, mocks vs real dependencies, coverage, flake hunting, CI integration. Use when adding, running, fixing, or debugging tests with pytest, vitest, jest, or mocha. Browser, CLI, and HTTP end-to-end flows belong to e2e-qa."
+description: "Write, run and fix automated tests: unit, integration, and browser, CLI or HTTP end-to-end; fixtures, mocks, coverage, flakes. Use when adding or debugging tests (pytest, vitest, jest, Playwright, Cypress) or E2E journeys."
 license: MIT
-allowed-tools: Bash
 metadata:
   display-name: "QA Automation"
-  version: "1.1"
+  version: "2.0"
   platforms: "claude-code codex"
-  tags: "testing unit integration fixtures"
+  tags: "testing unit integration e2e fixtures"
 ---
 
 # QA automation
 
-## What "test" means here
-- **Unit**: pure functions or single classes, no I/O, no network, no clock.
-- **Integration**: real dependencies (db, fs, queue) inside the process. Mocks at the system boundary only.
-- **E2E**: real running app, hit through its public interface (HTTP, browser, CLI). Covered in the `e2e-qa` skill.
+## Levels
 
-Pick the cheapest level that catches the bug. Most coverage should be unit; a thin layer of integration; a few critical E2E flows. Inverted pyramid = slow, flaky CI.
+- **Unit:** pure functions or single classes; no I/O, network or clock.
+- **Integration:** real dependencies (db, fs, queue) in process; mocks only at the system boundary.
+- **E2E:** the running app through its public interface (browser, HTTP, CLI); load `references/e2e.md`.
+
+Pick the cheapest level that catches the bug: mostly unit, a thin integration layer, a few critical E2E flows. An inverted pyramid means slow, flaky CI.
 
 ## Writing a test
-- Arrange / Act / Assert structure. One concept per test. If the test name needs "and," it's two tests.
-- Test the behavior, not the implementation. "Renders the user's name" beats "calls `formatName()` once."
-- Public API only. Don't reach into private state to assert.
-- Names describe the scenario AND the expected outcome: `returns_400_when_email_missing`, not `test_email_validation`.
-- Fixtures over `beforeEach` setup magic. Explicit data in the test body wins for readability when small.
 
-## Mocks vs reals - the heuristic
-- Database, filesystem, in-process queue: use the real thing (sqlite-in-memory, tmp dir, in-memory queue). Fast and faithful.
-- HTTP to your own service: real, in a test harness.
-- HTTP to a third party: stub at the boundary (`nock`, `respx`, `MSW`). Record real responses once; replay forever.
-- Time: inject a clock or use `vi.useFakeTimers()` / `freezegun` / `time-machine`. Never `await sleep(100)` to "wait for" something.
-- Randomness: seed it.
+- Arrange, act, assert; one concept per test. A name needing "and" is two tests.
+- Test behavior through the public API, not private state or call counts.
+- Name scenario and outcome: `returns_400_when_email_missing`.
+- Small explicit data in the test body beats `beforeEach` magic.
 
-Mocking persistence is a known footgun - schema drift between mock and real DB hides real bugs. Default to a real in-memory DB for any test that touches persistence.
+## Mocks versus reals
 
-## Stack-specific
+- Database, filesystem, in-process queue: real (in-memory db, tmp dir). Mocked persistence hides schema drift; default to a real in-memory db.
+- HTTP to your own service: real, in a harness. Third party: stub at the boundary (`nock`, `respx`, `MSW`) with responses recorded once.
+- Time: inject a clock or fake timers; never `sleep` to wait. Randomness: seed it.
 
-### Vitest (TypeScript)
-- `vitest run` for CI; `vitest` (watch) for dev.
-- `expect.soft()` lets multiple assertions report in one run - use sparingly.
-- `vi.mock()` for module replacement; reset with `vi.restoreAllMocks()` in `afterEach`.
-- `--coverage` uses v8 by default. Aim for meaningful coverage on changed lines, not a global %.
-- For React: `@testing-library/react` - query by accessible role/label, not test-ids.
+## Stack notes
 
-### Jest (TypeScript / JavaScript)
-- Similar discipline to Vitest. `jest --watchAll` for dev; `jest --ci` for CI.
-- `jest.mock()` is hoisted - order matters less, but resetting via `beforeEach(() => jest.resetAllMocks())` keeps tests isolated.
-- Snapshots: commit them, review diffs carefully, never `--update-snapshot` reflexively.
+- **Vitest and Jest:** `vitest run` or `jest --ci` in CI; reset mocks in `afterEach`; commit snapshots and never `--update-snapshot` reflexively; with React, query by role or label, not test-ids.
+- **Pytest:** `-x --ff` while developing; explicit fixture scope, `autouse` only for global setup; `parametrize` over loops; `pytest-randomly` for order bugs, `pytest-xdist` for parallelism.
+- **HTTP integration:** real app on an ephemeral port; per-test rollback transaction or fresh schema; one `login()` helper.
 
-### Pytest (Python)
-- `pytest -x --ff` during dev (stop on first fail, prioritize last failures).
-- Fixtures with `@pytest.fixture` and explicit scope (`function`/`module`/`session`). Avoid `autouse=True` except for global setup.
-- `pytest.mark.parametrize` over loops in test bodies - each row gets its own pass/fail.
-- `pytest -k "name"` to run a subset; `-m "marker"` for tagged groups.
-- `pytest-randomly` to surface order dependencies; `pytest-xdist` for parallelism.
+## Coverage
 
-### HTTP / API integration (any language)
-- Spin up the real app on an ephemeral port; hit it with `supertest` / `httpx` / `requests`. No mocking your own server.
-- Database: per-test transaction that rolls back, or a fresh in-memory schema per test file.
-- Auth: factor out a `login()` helper; don't copy-paste the JWT flow into every test.
+A percentage alone is meaningless: `expect(result).toBeDefined()` covers a line and proves nothing. Cover preconditions, branches, error paths and edge values (empty, max, negative, unicode). Delete unreachable defensive code instead of testing it.
 
-## Coverage discipline
-- Coverage % alone is meaningless. A 100%-covered function with assertions like `expect(result).toBeDefined()` is worthless.
-- Focus on: the function's preconditions, branches, error paths, edge values (empty, max, negative, unicode).
-- Lines you can't easily cover (truly unreachable defensive checks) - delete them. Don't add tests to chase the metric.
+## Flakes
 
-## Flake hunting
-A flaky test is broken. Don't retry it in CI; fix it.
-- Common causes: timing (`sleep`, race conditions), shared state across tests, real network, non-deterministic ordering, time-of-day logic.
-- Reproduce locally with `--shuffle` / `pytest-randomly` and `--repeat-each=20`.
-- If the underlying code is genuinely racy, the test surfaced a real bug - fix the code.
+A flaky test is broken; fix it, never retry it green. Causes: timing, shared state, real network, ordering, time-of-day logic. Reproduce with shuffled order and repeats (`--repeat-each=20`). A genuinely racy codebase means the test found a real bug.
 
 ## Adding tests to existing code
-1. Write the test first - for a real bug, write the failing test that reproduces it before fixing.
-2. Run only that test until green.
-3. Run the surrounding suite to check you didn't break neighbors.
-4. Run the full suite at least once before committing.
 
-## CI integration
-- Tests must pass deterministically on a clean checkout, no env vars beyond what `.env.example` documents.
-- Snapshot/golden files: commit them; review the diff carefully on changes.
-- Don't `--ignore` failing tests to merge a PR. Fix or delete.
+1. For a bug, write the failing reproduction first.
+2. Run only that test until green, then the surrounding suite, then the full suite once before committing.
+3. Tests pass deterministically on a clean checkout with only documented env vars.
+4. Never `--ignore` a failing test to merge; fix or delete it.
+
+Not a launch-and-look pass: that is `see-it-live`.
