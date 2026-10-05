@@ -970,6 +970,9 @@ class InstallerTests(unittest.TestCase):
             "x = (\n": "failed (SyntaxError)",
             "raise ImportError('missing dependency')\n": "failed (ImportError)",
             "import sys\nsys.exit(1)\n": "exited with 1",
+            "": "failed (KeyError)",
+            "import sys\nsys.exit(0)\n": "exited without a verdict",
+            "def run_pretooluse():\n    return None\n": "returned no verdict",
         }
         for source, reason in cases.items():
             guard.write_text(source, encoding="utf-8")
@@ -980,6 +983,20 @@ class InstallerTests(unittest.TestCase):
                 self.assertEqual(blocked.returncode, 2, blocked.stderr)
                 self.assertIn(f"merge guard {reason}: {guard}", blocked.stderr)
                 self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_guard_without_its_main_block_still_gives_a_verdict(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        source = (ROOT / "hooks" / "merge-guard.py").read_text(encoding="utf-8")
+        guard.write_text(source[: source.index('if __name__ == "__main__"')], encoding="utf-8")
+
+        result = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            "deny", json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"]
+        )
 
     @unittest.skipIf(
         os.name == "nt" or os.geteuid() == 0, "permission mode test requires a non-root POSIX user"

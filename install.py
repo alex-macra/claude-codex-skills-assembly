@@ -51,11 +51,19 @@ GUARD_RUNNER = "\n".join(
         "try:",
         " sys.argv=[g]",
         ' sys.stdin=io.TextIOWrapper(io.BytesIO(b),encoding="utf-8",errors="replace")',
-        ' runpy.run_path(g,run_name="__main__")',
+        ' p=runpy.run_path(g,run_name="merge_guard")["run_pretooluse"]',
         "except SystemExit as e:",
-        ' if e.code not in(0,None):f("exited with "+str(e.code))',
+        ' f("exited with "+str(e.code) if e.code not in(0,None) else "exited without a verdict")',
         'except FileNotFoundError:f("is missing")',
         'except Exception as e:f("failed ("+type(e).__name__+")")',
+        "try:",
+        " r=p()",
+        "except SystemExit as e:",
+        ' if e.code not in(0,None):f("exited with "+str(e.code))',
+        " raise",
+        'except Exception as e:f("failed ("+type(e).__name__+")")',
+        'if type(r) is not int:f("returned no verdict")',
+        "sys.exit(r)",
     )
 )
 
