@@ -889,36 +889,69 @@ class MergeGuardCheckTests(unittest.TestCase):
         )
         for command in commands:
             with self.subTest(command=command):
-                hook = subprocess.run(
-                    [sys.executable, str(HOOKS / "merge-guard.py")],
-                    input=json.dumps(
-                        {
-                            "tool_name": "Bash",
-                            "tool_input": {"command": command},
-                            "cwd": str(self.work),
-                        }
-                    ),
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd=str(self.work),
-                    check=False,
-                )
-                self.assertEqual(0, hook.returncode, hook.stderr)
-                expected = (
-                    json.loads(hook.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
-                    if hook.stdout.strip()
-                    else ""
-                )
-                result = self.check(command)
+                expected = self.hook_reason(command, self.work)
+                result = self.check("--cwd", str(self.work), command)
                 self.assertEqual((1 if expected else 0, expected), (result.returncode, result.stdout.strip()))
 
-    def test_missing_or_blank_command_prints_usage_and_allows(self) -> None:
-        for args in ((), ("  ",), ("git status", "extra")):
+    def hook_reason(self, command: str, cwd: Path) -> str:
+        hook = subprocess.run(
+            [sys.executable, str(HOOKS / "merge-guard.py")],
+            input=json.dumps(
+                {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(cwd)}
+            ),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(self.work),
+            check=False,
+        )
+        self.assertEqual(0, hook.returncode, hook.stderr)
+        if not hook.stdout.strip():
+            return ""
+        return json.loads(hook.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+
+    def test_cwd_resolves_implicit_push_targets_in_the_shell_directory(self) -> None:
+        subprocess.run(
+            ["git", "-C", str(self.work), "symbolic-ref", "HEAD", "refs/heads/topic/example"],
+            check=True,
+        )
+        main_checkout = self.temp / "main-checkout"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(main_checkout)], check=True)
+
+        expected = self.hook_reason("git push", main_checkout)
+        scoped = self.check("--cwd", str(main_checkout), "git push")
+        unscoped = self.check("git push")
+
+        self.assertIn("protected branch 'main'", expected)
+        self.assertEqual((1, expected), (scoped.returncode, scoped.stdout.strip()))
+        self.assertEqual((0, ""), (unscoped.returncode, unscoped.stdout))
+
+    def test_blank_command_prints_usage_and_allows(self) -> None:
+        result = self.check("  ")
+
+        self.assertEqual(0, result.returncode)
+        self.assertIn("usage:", result.stderr)
+
+    def test_any_other_argument_shape_prints_usage_and_denies(self) -> None:
+        shapes = (
+            (),
+            ("git status", "extra"),
+            ("gh", "pr", "merge", "12", "--admin"),
+            ("--cwd", str(self.work)),
+            ("--cwd", str(self.work), "git", "push"),
+        )
+        for args in shapes:
             with self.subTest(args=args):
                 result = self.check(*args)
-                self.assertEqual(0, result.returncode)
+                self.assertEqual((1, ""), (result.returncode, result.stdout))
                 self.assertIn("usage:", result.stderr)
+
+    def test_cwd_that_is_not_a_directory_denies(self) -> None:
+        for cwd in ("", str(self.temp / "missing")):
+            with self.subTest(cwd=cwd):
+                result = self.check("--cwd", cwd, "ls")
+                self.assertEqual(1, result.returncode)
+                self.assertIn("--cwd is not a directory", result.stderr)
 
     def test_policy_crash_fails_closed(self) -> None:
         hooks = self.hooks_with_policy("def run_pretooluse():\n    raise RuntimeError('boom')\n")

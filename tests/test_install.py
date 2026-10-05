@@ -962,6 +962,41 @@ class InstallerTests(unittest.TestCase):
                 result = self.run_guard_hook(command, payload)
                 self.assertEqual((0, "", ""), (result.returncode, result.stdout, result.stderr))
 
+    @unittest.skipIf(os.name == "nt", "the hook command is POSIX shell")
+    def test_failing_merge_guard_blocks_only_git_gh_and_curl(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        cases = {
+            "x = (\n": "failed (SyntaxError)",
+            "raise ImportError('missing dependency')\n": "failed (ImportError)",
+            "import sys\nsys.exit(1)\n": "exited with 1",
+        }
+        for source, reason in cases.items():
+            guard.write_text(source, encoding="utf-8")
+            with self.subTest(guard=source):
+                blocked = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+                allowed = self.run_guard_hook(command, self.bash_payload("ls"))
+
+                self.assertEqual(blocked.returncode, 2, blocked.stderr)
+                self.assertIn(f"merge guard {reason}: {guard}", blocked.stderr)
+                self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+    @unittest.skipIf(
+        os.name == "nt" or os.geteuid() == 0, "permission mode test requires a non-root POSIX user"
+    )
+    def test_unreadable_merge_guard_blocks_only_git_gh_and_curl(self) -> None:
+        catalog, guard = self.guard_overlay()
+        [command] = self.installed_guard_commands(catalog)
+        guard.chmod(0)
+        self.addCleanup(guard.chmod, 0o644)
+
+        blocked = self.run_guard_hook(command, self.bash_payload("git push origin main"))
+        allowed = self.run_guard_hook(command, self.bash_payload("ls"))
+
+        self.assertEqual(blocked.returncode, 2, blocked.stderr)
+        self.assertIn(f"merge guard failed (PermissionError): {guard}", blocked.stderr)
+        self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
     def test_previous_merge_guard_entry_is_replaced_once(self) -> None:
         settings = Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "settings.json"
         settings.parent.mkdir(parents=True)
@@ -988,7 +1023,9 @@ class InstallerTests(unittest.TestCase):
         again = self.installed_guard_commands(ROOT / "catalog.json")
 
         self.assertEqual(len(commands), 1, commands)
-        self.assertTrue(commands[0].startswith("test -f "), commands[0])
+        self.assertTrue(
+            commands[0].startswith(f"{shlex.quote(str(installer.PYTHON))} -I -c "), commands[0]
+        )
         self.assertNotIn(previous, commands)
         self.assertEqual(commands, again)
         self.assertEqual(first, settings.read_text())

@@ -35,16 +35,27 @@ STATE_FILE = ".ai-skills-managed.json"
 STATE_DIRS = {"skills": "skills", "agents": "agents", "outputStyles": "output-styles"}
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PYTHON = Path(sys.executable).resolve(strict=False)
-MISSING_GUARD_CHECK = "\n".join(
+GUARD_RUNNER = "\n".join(
     (
-        "import json,re,sys",
-        't=sys.stdin.buffer.read().decode("utf-8","replace")',
-        'try:c=json.loads(t)["tool_input"]["command"]',
-        "except Exception:c=t",
-        "if not isinstance(c,str):c=t",
-        'if re.search(r"\\b(?:git|gh|curl)\\b",c,re.I):'
-        'sys.stderr.write("Blocked: merge guard is missing: "+sys.argv[1]+"\\n");'
-        "sys.exit(2)",
+        "import io,json,re,runpy,sys",
+        "g=sys.argv[1]",
+        "b=sys.stdin.buffer.read()",
+        "def f(why):",
+        ' t=b.decode("utf-8","replace")',
+        ' try:c=json.loads(t)["tool_input"]["command"]',
+        " except Exception:c=t",
+        " if not isinstance(c,str):c=t",
+        ' if re.search(r"\\b(?:git|gh|curl)\\b",c,re.I):',
+        '  sys.stderr.write("Blocked: merge guard "+why+": "+g+"\\n");sys.exit(2)',
+        " sys.exit(0)",
+        "try:",
+        " sys.argv=[g]",
+        ' sys.stdin=io.TextIOWrapper(io.BytesIO(b),encoding="utf-8",errors="replace")',
+        ' runpy.run_path(g,run_name="__main__")',
+        "except SystemExit as e:",
+        ' if e.code not in(0,None):f("exited with "+str(e.code))',
+        'except FileNotFoundError:f("is missing")',
+        'except Exception as e:f("failed ("+type(e).__name__+")")',
     )
 )
 
@@ -906,10 +917,9 @@ def hook_entry(catalogs: CatalogSet, spec: HookSpec) -> dict:
     catalog_value = os.pathsep.join(str(path) for path in catalogs.paths)
     interpreter = shlex.quote(str(PYTHON))
     if spec.key == "mergeGuard":
-        guard = shlex.quote(str(source))
         command = (
-            f"test -f {guard} && exec {interpreter} -I {guard} || "
-            f"exec {interpreter} -I -c {shlex.quote(MISSING_GUARD_CHECK)} {guard}"
+            f"{interpreter} -I -c {shlex.quote(GUARD_RUNNER)} "
+            f"{shlex.quote(str(source))}"
         )
     else:
         command = (
@@ -963,7 +973,12 @@ def hook_command_managed(
             continue
         if normalized not in expected:
             continue
-        interpreter_index = index - 2 if index >= 2 and tokens[index - 1] == "-I" else index - 1
+        if index >= 4 and tokens[index - 3 : index - 1] == ["-I", "-c"]:
+            interpreter_index = index - 4
+        elif index >= 2 and tokens[index - 1] == "-I":
+            interpreter_index = index - 2
+        else:
+            interpreter_index = index - 1
         interpreter = Path(tokens[interpreter_index]).name
         if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?", interpreter):
             return True

@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Exit-code-only protected-branch check, shared by client hooks.
 
-  merge-guard-check.py <command string>     shell-command checks (R1-R4)
+  merge-guard-check.py [--cwd DIR] <command string>
 
 Exit 0 allows. Exit 1 denies: protected-branch push, `gh pr merge --admin`,
-behind-base `gh pr merge`, direct API/GraphQL PR merge. Any merge or push
-that cannot be verified is denied -- the guard fails closed.
+behind-base `gh pr merge`, and pull request merges through `gh api` (REST or
+GraphQL). Merges sent by other HTTP clients, such as curl, are not inspected;
+remote branch protection covers them. Any merge or push that cannot be
+verified is denied, and so is any call that does not pass exactly one command
+string -- the check fails closed. A single blank command is allowed.
+
+DIR is the directory the shell tool runs the command in. Adapters must pass
+it: the current branch, push remote, and remote default branch are resolved
+there, and without it they are resolved in this process's directory.
 
 merge-guard.py stays the hook for Claude Code, Codex, and git itself
 (pre-push). This entry point exists so thin client adapters, such as an
@@ -29,17 +36,29 @@ import importlib
 
 merge_guard = importlib.import_module("merge-guard")
 
+USAGE = "usage: merge-guard-check.py [--cwd DIR] <command string>"
 
-def main() -> int:
-    if len(sys.argv) != 2 or not sys.argv[1].strip():
-        print("usage: merge-guard-check.py <command string>", file=sys.stderr)
+
+def main(argv: list[str]) -> int:
+    cwd: str | None = None
+    if len(argv) == 3 and argv[0] == "--cwd":
+        if not argv[1] or not Path(argv[1]).is_dir():
+            print(f"Blocked: --cwd is not a directory: {argv[1]!r}", file=sys.stderr)
+            return 1
+        cwd = str(Path(argv[1]).resolve())
+        argv = argv[2:]
+    if len(argv) != 1:
+        print(USAGE, file=sys.stderr)
+        return 1
+    if not argv[0].strip():
+        print(USAGE, file=sys.stderr)
         return 0
 
-    payload = json.dumps(
-        {"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}
-    )
+    request: dict = {"tool_name": "Bash", "tool_input": {"command": argv[0]}}
+    if cwd is not None:
+        request["cwd"] = cwd
     hidden = io.StringIO()
-    sys.stdin = io.StringIO(payload)
+    sys.stdin = io.StringIO(json.dumps(request))
     try:
         with redirect_stdout(hidden):
             merge_guard.run_pretooluse()
@@ -65,4 +84,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
