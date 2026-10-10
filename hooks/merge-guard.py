@@ -89,10 +89,32 @@ COMMAND_WRAPPERS = {
 }
 SHELL_PREFIXES = {"!", "do", "elif", "if", "then", "until", "while"}
 SHELL_PROGRAMS = {"ash", "bash", "dash", "ksh", "sh", "zsh"}
-STDIN_INTERPRETERS = SHELL_PROGRAMS | {"at", "batch", "doas", "ssh", "su", "sudo"}
+STDIN_INTERPRETERS = SHELL_PROGRAMS | {
+    "at",
+    "batch",
+    "busybox",
+    "csh",
+    "doas",
+    "fish",
+    "ksh93",
+    "mksh",
+    "oksh",
+    "pdksh",
+    "posh",
+    "rbash",
+    "rksh",
+    "rzsh",
+    "ssh",
+    "su",
+    "sudo",
+    "tcsh",
+    "toybox",
+    "yash",
+}
 HEREDOC_DELIMITER_RE = re.compile(
     r"(?:'([A-Za-z0-9_]+)'|\"([A-Za-z0-9_]+)\"|(\\?)([A-Za-z0-9_]+))(?=[ \t\n;&|()<>]|$)"
 )
+GLOB_CHARACTERS = "*?["
 SHELL_PUNCTUATION = ";&|(){}\n"
 SHELL_BOUNDARY_CHARS = frozenset(SHELL_PUNCTUATION)
 MAX_SHELL_DEPTH = 32
@@ -450,54 +472,78 @@ def _nested_eval_command(tokens: list[str], eval_index: int) -> str | None:
     return nested
 
 
+def _names_interpreter(token: str) -> bool:
+    if "$" in token or "/proc/" in token:
+        return True
+    if "/" in token and any(character in token for character in GLOB_CHARACTERS):
+        return True
+    for piece in re.split(r"[\s=]+", token):
+        if piece.startswith("-S"):
+            piece = piece[2:]
+        if _program_name(piece) in STDIN_INTERPRETERS:
+            return True
+    return False
+
+
 def _runs_interpreter(segment: list[str]) -> bool:
     for index, token in enumerate(segment):
-        if _program_name(token) in STDIN_INTERPRETERS:
+        if _names_interpreter(token):
             return True
         if not _in_command_position(segment, index):
             continue
         if token in {"eval", "source", "."}:
             return True
-        if token.startswith("$") or SUBSTITUTION_PLACEHOLDER in token:
+        if (
+            SUBSTITUTION_PLACEHOLDER in token
+            or "/" in token
+            or any(character in token for character in GLOB_CHARACTERS)
+        ):
             return True
     return False
+
+
+class _Inspection:
+    __slots__ = ("interpreter_seen",)
+
+    def __init__(self) -> None:
+        self.interpreter_seen = False
 
 
 def _command_invocations(
     command: str,
     inherited_override: bool = False,
     depth: int = 0,
-    interpreters: list[bool] | None = None,
+    inspection: _Inspection | None = None,
 ) -> list[tuple[str, list[str], bool]]:
     if depth > MAX_SHELL_DEPTH:
         raise CommandParseError("nested shell command exceeds parser depth")
     if len(command) > MAX_SHELL_CHARS:
         raise CommandParseError("nested shell command exceeds parser size")
 
-    if interpreters is None:
+    if inspection is None:
         stripped = _strip_heredoc_bodies(command)
         if stripped != command:
-            found: list[bool] = []
+            stripped_inspection = _Inspection()
             try:
                 invocations = _command_invocations(
-                    stripped, inherited_override, depth, found
+                    stripped, inherited_override, depth, stripped_inspection
                 )
-                if not found:
+                if not stripped_inspection.interpreter_seen:
                     return invocations
             except CommandParseError:
                 pass
-        interpreters = []
+        inspection = _Inspection()
 
     invocations: list[tuple[str, list[str], bool]] = []
     masked, substitutions = _mask_command_substitutions(command)
     for substitution in substitutions:
         invocations.extend(
-            _command_invocations(substitution, inherited_override, depth + 1, interpreters)
+            _command_invocations(substitution, inherited_override, depth + 1, inspection)
         )
     programs = {"eval", "git", "gh"} | SHELL_PROGRAMS
     for segment in _shell_segments(_shell_tokens(masked)):
         if _runs_interpreter(segment):
-            interpreters.append(True)
+            inspection.interpreter_seen = True
         for index in _command_positions(segment, programs):
             program = _program_name(segment[index])
             overridden = _invocation_override(segment, index, inherited_override)
@@ -511,7 +557,7 @@ def _command_invocations(
             )
             if nested is not None:
                 invocations.extend(
-                    _command_invocations(nested, overridden, depth + 1, interpreters)
+                    _command_invocations(nested, overridden, depth + 1, inspection)
                 )
     return invocations
 

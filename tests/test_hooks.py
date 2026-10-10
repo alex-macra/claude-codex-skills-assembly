@@ -868,10 +868,38 @@ class MergeGuardTests(unittest.TestCase):
             ("sh -s <<'EOF'\ngh pr merge 12 --admin\nEOF", "--admin"),
             ("bash <<'EOF'\necho it's\nEOF", "could not safely inspect"),
             ("cat > run.sh <<'EOF'\ngit push origin main\nEOF\nbash run.sh", protected),
+            ("env -S'sh' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("env -S 'bash -s' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("env --split-string='bash -s' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 $SHELL <<'EOF'\ngit push origin main\nEOF", protected),
+            ("flock /tmp/l $SHELL <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 /usr/bin/$X <<'EOF'\ngit push origin main\nEOF", protected),
+            ("/proc/self/exe <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 /proc/$$/exe <<'EOF'\ngit push origin main\nEOF", protected),
+            ("alias x=bash\nx <<'EOF'\ngit push origin main\nEOF", protected),
+            ("cat <<'EOF' | /bin/*sh\ngit push origin main\nEOF", protected),
+            ("cat <<'EOF' | busybox\ngit push origin main\nEOF", protected),
+            ("ba?h <<'EOF'\ngit push origin main\nEOF", protected),
+            ("ba[s]h <<'EOF'\ngit push origin main\nEOF", protected),
+            ("cat > deploy.sh <<'EOF'\n#!/bin/sh\ngit push origin main\nEOF\nchmod +x deploy.sh && ./deploy.sh", protected),
+            ("cat <<'EOF' >x\ngit push origin main\nEOF\nchmod +x x; ./x", protected),
+            ("install -m755 /dev/stdin y <<'EOF'\ngit push origin main\nEOF\n./y", protected),
+            ("cat > /tmp/p <<'EOF'\ngit push origin main\nEOF\nchmod +x /tmp/p; /tmp/p", protected),
+            ("cat > bin/x <<'EOF'\ngit push origin main\nEOF\nchmod +x bin/x; bin/x", protected),
         )
         for command, expected in cases:
             with self.subTest(command=command):
                 self.assertIn(expected, self.deny_reason(command) or "")
+
+    def test_heredoc_fed_to_any_shell_is_inspected(self) -> None:
+        shells = (
+            "mksh", "yash", "posh", "csh", "tcsh", "fish", "/bin/tcsh",
+            "rbash", "rksh", "rzsh", "ksh93", "oksh", "pdksh",
+        )
+        for shell in shells:
+            command = f"{shell} <<'EOF'\ngit push origin main\nEOF"
+            with self.subTest(command=command):
+                self.assertIn("protected branch 'main'", self.deny_reason(command) or "")
 
     def test_unquoted_heredoc_bodies_keep_the_base_behaviour(self) -> None:
         cases = (
