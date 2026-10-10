@@ -832,6 +832,163 @@ class MergeGuardTests(unittest.TestCase):
                 result = run_hook("merge-guard.py", payload)
                 self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_heredoc_data_bodies_are_allowed(self) -> None:
+        commands = (
+            "cat > notes.txt <<'EOF'\nit's fine\nEOF",
+            "git commit -F - <<'EOF'\nIt's a fix\nEOF",
+            "git commit -m \"$(cat <<'EOF'\nIt's a fix\nEOF\n)\"",
+            "cat <<-EOF\n\tit's\n\tEOF",
+            "cat <<EOF\nit's\nEOF",
+            "cat <<'EOF'\nit's",
+            "cat > notes.md <<'EOF'\ngh pr merge 12 --admin\nEOF",
+            "cat <<'EOF'\n$(git push origin main)\nEOF",
+            "cat <<\"EOF\"\n$(git push origin main)\nEOF",
+            "cat <<\\EOF\n$(git push origin main)\nEOF",
+            "python3 - <<'PY'\n# it's fine\nprint(1)\nPY",
+            "git add . && cat > f <<'EOF'\nit's\nEOF",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertIsNone(self.deny_reason(command))
+
+    def test_heredoc_fed_to_an_interpreter_is_inspected(self) -> None:
+        protected = "protected branch 'main'"
+        cases = (
+            ("bash <<'EOF'\ngit push origin main\nEOF", protected),
+            ("cat <<'EOF' | bash\ngit push origin main\nEOF", protected),
+            ("bash -c \"$(cat <<'EOF'\ngit push origin main\nEOF\n)\"", protected),
+            ("x=\"$(bash <<'EOF'\ngit push origin main\nEOF\n)\"", protected),
+            ("source /dev/stdin <<'EOF'\ngit push origin main\nEOF", protected),
+            ("sudo bash <<'EOF'\ngit push origin main\nEOF", protected),
+            ("sudo -s <<'EOF'\ngit push origin main\nEOF", protected),
+            ("at now <<'EOF'\ngit push origin main\nEOF", protected),
+            ("ssh host <<'EOF'\ngit push origin main\nEOF", protected),
+            ("$SHELL <<'EOF'\ngit push origin main\nEOF", protected),
+            ("$(echo bash) <<'EOF'\ngit push origin main\nEOF", protected),
+            ("sh -s <<'EOF'\ngh pr merge 12 --admin\nEOF", "--admin"),
+            ("bash <<'EOF'\necho it's\nEOF", "could not safely inspect"),
+            ("cat > run.sh <<'EOF'\ngit push origin main\nEOF\nbash run.sh", protected),
+            ("env -S'sh' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("env -S 'bash -s' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("env --split-string='bash -s' <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 $SHELL <<'EOF'\ngit push origin main\nEOF", protected),
+            ("flock /tmp/l $SHELL <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 /usr/bin/$X <<'EOF'\ngit push origin main\nEOF", protected),
+            ("/proc/self/exe <<'EOF'\ngit push origin main\nEOF", protected),
+            ("timeout 5 /proc/$$/exe <<'EOF'\ngit push origin main\nEOF", protected),
+            ("alias x=bash\nx <<'EOF'\ngit push origin main\nEOF", protected),
+            ("cat <<'EOF' | /bin/*sh\ngit push origin main\nEOF", protected),
+            ("cat <<'EOF' | busybox\ngit push origin main\nEOF", protected),
+            ("ba?h <<'EOF'\ngit push origin main\nEOF", protected),
+            ("ba[s]h <<'EOF'\ngit push origin main\nEOF", protected),
+            ("cat > deploy.sh <<'EOF'\n#!/bin/sh\ngit push origin main\nEOF\nchmod +x deploy.sh && ./deploy.sh", protected),
+            ("cat <<'EOF' >x\ngit push origin main\nEOF\nchmod +x x; ./x", protected),
+            ("install -m755 /dev/stdin y <<'EOF'\ngit push origin main\nEOF\n./y", protected),
+            ("cat > /tmp/p <<'EOF'\ngit push origin main\nEOF\nchmod +x /tmp/p; /tmp/p", protected),
+            ("cat > bin/x <<'EOF'\ngit push origin main\nEOF\nchmod +x bin/x; bin/x", protected),
+        )
+        for command, expected in cases:
+            with self.subTest(command=command):
+                self.assertIn(expected, self.deny_reason(command) or "")
+
+    def test_heredoc_fed_to_any_shell_is_inspected(self) -> None:
+        shells = (
+            "mksh", "yash", "posh", "csh", "tcsh", "fish", "/bin/tcsh",
+            "rbash", "rksh", "rzsh", "ksh93", "oksh", "pdksh",
+        )
+        for shell in shells:
+            command = f"{shell} <<'EOF'\ngit push origin main\nEOF"
+            with self.subTest(command=command):
+                self.assertIn("protected branch 'main'", self.deny_reason(command) or "")
+
+    def test_unquoted_heredoc_bodies_keep_the_base_behaviour(self) -> None:
+        cases = (
+            ("cat <<EOF\n$(git push origin main)\nEOF", "protected branch 'main'"),
+            ("cat <<EOF\n`gh pr merge 12 --admin`\nEOF", "--admin"),
+            ("cat > f <<EOF\nIt's $(gh pr merge 12 --admin)\nEOF", "could not safely inspect"),
+            ("cat <<E\"O\"F\n$(git push origin main)\nEOF", "protected branch 'main'"),
+        )
+        for command, expected in cases:
+            with self.subTest(command=command):
+                self.assertIn(expected, self.deny_reason(command) or "")
+
+    def test_commands_after_a_heredoc_are_inspected(self) -> None:
+        protected = "protected branch 'main'"
+        base_denial = "could not safely inspect"
+        cases = (
+            ("cat > f <<'EOF'\nit's\nEOF\ngit push origin main", protected),
+            ("cat <<'A' <<'B'\none\nA\ntwo\nB\ngh pr merge 12 --admin", "--admin"),
+            ("cat <<-EOF\n\tbody\n\tEOF\ngit push origin main", protected),
+            (
+                "a=$(cat <<'EOF'\none\nEOF)\ngit push origin main\n"
+                "b=$(cat <<'EOF'\ntwo\nEOF\n)\necho done",
+                protected,
+            ),
+            ("cat <<EOF\nEO\\\nF\ngit push origin main", protected),
+            ("cat <<-EOF\n\tEO\\\nF\ngit push origin main", protected),
+            ("cat <<EOF\nE\\\nOF\ngit push origin main\nEOF", protected),
+            ("cat <<EOF ${x:-\n}; git push origin main\nEOF", protected),
+            ("echo \"$(echo \"<<X \" )\"\ngit push origin main\nX", protected),
+            ("cat <<'EOF'\r\nit's\nEOF\r\ngit push origin main", base_denial),
+            ("cat <<'EOF'\r\nbody\nEOF\r\ngit push origin main", protected),
+            ("cat <<EOF\r\nbody\nEOF\r\ngit push origin main", protected),
+            ("cat <<'EOF'\xa0\nit's\nEOF\xa0\ngit push origin main", base_denial),
+            ("cat <<'EOF'\xa0\nbody\nEOF\xa0\ngit push origin main", protected),
+            ("cat <<'EOF'\x0b\nit's\nEOF\x0b\ngit push origin main", base_denial),
+            ("cat <<'EOF'\x0b\nbody\nEOF\x0b\ngit push origin main", protected),
+            ("cat <<'EOF'\x0c\nit's\nEOF\x0c\ngit push origin main", base_denial),
+            ("cat <<'EOF'\x0c\nbody\nEOF\x0c\ngit push origin main", protected),
+            ("cat <<'EOF'\x1c\nit's\nEOF\x1c\ngit push origin main", base_denial),
+            ("cat <<'EOF'\x1c\nbody\nEOF\x1c\ngit push origin main", protected),
+        )
+        for command, expected in cases:
+            with self.subTest(command=command):
+                self.assertIn(expected, self.deny_reason(command) or "")
+
+    def test_heredoc_lookalikes_do_not_hide_commands(self) -> None:
+        lookalikes = (
+            "(( x << y ))",
+            "echo $((1 << 2))",
+            "echo $[1<<2]",
+            "echo ${x:-<<X}",
+            "echo hi # <<X",
+            "echo '<<X'",
+            'echo "<<X"',
+            "echo \\<<X",
+            "cat <<<X",
+            "for((i=0;i<<2;i++)); do :; done",
+            "if((1<<2)); then :; fi",
+            "{((1<<2));}",
+            "f(){((1<<2));}\nf",
+            "echo $[a[1]<<2]",
+            "echo $[ $[1]<<2 ]",
+            "echo $[ $(echo ])<<2 ]",
+            "a[1<<2]=3",
+            "a=([1<<2]=x)",
+            "a[1<<2 ]=3",
+        )
+        for lookalike in lookalikes:
+            command = f"{lookalike}\ngit push origin main\nX\n2"
+            with self.subTest(command=command):
+                self.assertIn("protected branch 'main'", self.deny_reason(command) or "")
+        shell_runs_the_push = (
+            "cat <<$(x)\nfoo\n$(x)\ngit push origin main\n$",
+            "cat <<$'EOF'\nfoo\nEOF\ngit push origin main\n$EOF",
+            'cat <<$"EOF"\nfoo\nEOF\ngit push origin main\n$EOF',
+            "cat <<`x`\nfoo\n`x`\ngit push origin main\n`x`",
+            "cat <<EOF$(x)\nfoo\nEOF\ngit push origin main",
+        )
+        for command in shell_runs_the_push:
+            with self.subTest(command=command):
+                self.assertIn("protected branch 'main'", self.deny_reason(command) or "")
+        ansi_c_quoted = (
+            "echo $'\\'<<X\n'; git push origin main\nX",
+            "echo $'it\\'s <<X\n'; git push origin main\nX",
+        )
+        for command in ansi_c_quoted:
+            with self.subTest(command=command):
+                self.assertIn("could not safely inspect", self.deny_reason(command) or "")
+
 
 class MergeGuardCheckTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -892,6 +1049,14 @@ class MergeGuardCheckTests(unittest.TestCase):
                 expected = self.hook_reason(command, self.work)
                 result = self.check("--cwd", str(self.work), command)
                 self.assertEqual((1 if expected else 0, expected), (result.returncode, result.stdout.strip()))
+
+    def test_heredoc_decisions_match_the_pretooluse_hook(self) -> None:
+        allowed = self.check("cat > f <<'EOF'\nit's\nEOF")
+        self.assertEqual((0, "", ""), (allowed.returncode, allowed.stdout, allowed.stderr))
+
+        denied = self.check("bash <<'EOF'\ngit push origin main\nEOF")
+        self.assertEqual(1, denied.returncode, denied.stderr)
+        self.assertIn("protected branch 'main'", denied.stdout)
 
     def hook_reason(self, command: str, cwd: Path) -> str:
         hook = subprocess.run(
