@@ -10,6 +10,11 @@ These checks are defense in depth, not a security boundary. Disabled hooks,
 alternate clients, and runtime-generated commands can bypass local tooling;
 remote branch protection and restricted credentials remain authoritative.
 
+A heredoc body is data, not shell, only when the case is unambiguous: a plain
+delimiter word, no shell interpreter anywhere in the command, and, for an
+unquoted delimiter, no expansion in the body. Every other heredoc is lexed as
+shell, exactly as without this rule.
+
 Rules
   R1  direct push to a protected branch
   R2  `gh pr merge` whose head is behind its base
@@ -84,6 +89,10 @@ COMMAND_WRAPPERS = {
 }
 SHELL_PREFIXES = {"!", "do", "elif", "if", "then", "until", "while"}
 SHELL_PROGRAMS = {"ash", "bash", "dash", "ksh", "sh", "zsh"}
+STDIN_INTERPRETERS = SHELL_PROGRAMS | {"at", "batch", "doas", "ssh", "su", "sudo"}
+HEREDOC_DELIMITER_RE = re.compile(
+    r"(?:'([A-Za-z0-9_]+)'|\"([A-Za-z0-9_]+)\"|(\\?)([A-Za-z0-9_]+))(?=[ \t\n;&|()<>]|$)"
+)
 SHELL_PUNCTUATION = ";&|(){}\n"
 SHELL_BOUNDARY_CHARS = frozenset(SHELL_PUNCTUATION)
 MAX_SHELL_DEPTH = 32
@@ -209,6 +218,103 @@ def _mask_command_substitutions(command: str) -> tuple[str, list[str]]:
         if len(nested) > MAX_SHELL_EXPANSIONS:
             raise CommandParseError("too many command substitutions")
     return "".join(masked), nested
+
+
+def _heredoc_body_end(
+    command: str, index: int, delimiter: str, strip_tabs: bool, expands: bool
+) -> int | None:
+    while index < len(command):
+        end = command.find("\n", index)
+        line_end = len(command) if end == -1 else end
+        line = command[index:line_end]
+        index = min(line_end + 1, len(command))
+        candidate = line.lstrip("\t") if strip_tabs else line
+        if candidate == delimiter:
+            return index
+        if candidate.startswith(delimiter + ")"):
+            return None
+        if expands and (line.endswith("\\") or "$" in line or "`" in line):
+            return None
+    return index
+
+
+def _strip_heredoc_bodies(command: str) -> str:
+    if "<<" not in command:
+        return command
+    pieces: list[str] = []
+    pending: list[tuple[str, bool, bool]] = []
+    pending_depth = 0
+    quotes: list[str | None] = [None]
+    copied = 0
+    index = 0
+    while index < len(command):
+        character = command[index]
+        quote = quotes[-1]
+        width = 1
+        if character == "\\" and quote != "'":
+            width = 2
+        elif quote == "'":
+            if character == "'":
+                quotes[-1] = None
+        elif character == "'" and quote is None:
+            quotes[-1] = "'"
+        elif character == '"':
+            quotes[-1] = None if quote == '"' else '"'
+        elif (
+            character == "`"
+            or command.startswith(("$((", "${", "$["), index)
+            or (quote is None and command.startswith(("$'", '$"'), index))
+        ):
+            return command
+        elif command.startswith("$(", index):
+            quotes.append(None)
+            width = 2
+        elif quote is not None:
+            pass
+        elif character == "(":
+            if command.startswith("((", index) or len(quotes) > 1:
+                return command
+        elif character == ")":
+            if len(quotes) > 1:
+                quotes.pop()
+                if pending and len(quotes) < pending_depth:
+                    return command
+        elif character == "[":
+            return command
+        elif character == "#" and (index == 0 or command[index - 1] in " \t\n;&|()"):
+            return command
+        elif command.startswith("<<<", index):
+            width = 3
+        elif command.startswith("<<", index):
+            cursor = index + 2
+            strip_tabs = command.startswith("-", cursor)
+            cursor += strip_tabs
+            while cursor < len(command) and command[cursor] in " \t":
+                cursor += 1
+            match = HEREDOC_DELIMITER_RE.match(command, cursor)
+            if match is None or (pending and pending_depth != len(quotes)):
+                return command
+            single, double, backslash, word = match.groups()
+            quoted = bool(single or double or backslash)
+            pending.append((single or double or word, strip_tabs, quoted))
+            pending_depth = len(quotes)
+            width = match.end() - index
+        elif character == "\n" and pending:
+            if len(quotes) != pending_depth:
+                return command
+            index += 1
+            pieces.append(command[copied:index])
+            for delimiter, strip_tabs, quoted in pending:
+                end = _heredoc_body_end(command, index, delimiter, strip_tabs, not quoted)
+                if end is None:
+                    return command
+                index = end
+            copied = index
+            pending = []
+            continue
+        index += width
+    pieces.append(command[copied:])
+    return "".join(pieces)
 
 
 def _program_name(token: str) -> str:
@@ -344,24 +450,54 @@ def _nested_eval_command(tokens: list[str], eval_index: int) -> str | None:
     return nested
 
 
+def _runs_interpreter(segment: list[str]) -> bool:
+    for index, token in enumerate(segment):
+        if _program_name(token) in STDIN_INTERPRETERS:
+            return True
+        if not _in_command_position(segment, index):
+            continue
+        if token in {"eval", "source", "."}:
+            return True
+        if token.startswith("$") or SUBSTITUTION_PLACEHOLDER in token:
+            return True
+    return False
+
+
 def _command_invocations(
     command: str,
     inherited_override: bool = False,
     depth: int = 0,
+    interpreters: list[bool] | None = None,
 ) -> list[tuple[str, list[str], bool]]:
     if depth > MAX_SHELL_DEPTH:
         raise CommandParseError("nested shell command exceeds parser depth")
     if len(command) > MAX_SHELL_CHARS:
         raise CommandParseError("nested shell command exceeds parser size")
 
+    if interpreters is None:
+        stripped = _strip_heredoc_bodies(command)
+        if stripped != command:
+            found: list[bool] = []
+            try:
+                invocations = _command_invocations(
+                    stripped, inherited_override, depth, found
+                )
+                if not found:
+                    return invocations
+            except CommandParseError:
+                pass
+        interpreters = []
+
     invocations: list[tuple[str, list[str], bool]] = []
     masked, substitutions = _mask_command_substitutions(command)
     for substitution in substitutions:
         invocations.extend(
-            _command_invocations(substitution, inherited_override, depth + 1)
+            _command_invocations(substitution, inherited_override, depth + 1, interpreters)
         )
     programs = {"eval", "git", "gh"} | SHELL_PROGRAMS
     for segment in _shell_segments(_shell_tokens(masked)):
+        if _runs_interpreter(segment):
+            interpreters.append(True)
         for index in _command_positions(segment, programs):
             program = _program_name(segment[index])
             overridden = _invocation_override(segment, index, inherited_override)
@@ -375,7 +511,7 @@ def _command_invocations(
             )
             if nested is not None:
                 invocations.extend(
-                    _command_invocations(nested, overridden, depth + 1)
+                    _command_invocations(nested, overridden, depth + 1, interpreters)
                 )
     return invocations
 
