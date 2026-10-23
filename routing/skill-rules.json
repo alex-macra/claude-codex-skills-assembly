@@ -253,19 +253,20 @@
     "post-merge-cleanup": {
       "type": "process",
       "priority": "high",
-      "description": "Verify a PR merge and remove only its exact clean, idle task worktree after an explicit cleanup request.",
+      "description": "Verify a PR merge and remove only its exact clean, idle task worktree after a cleanup request or standing rule.",
       "promptTriggers": {
         "keywords": [
           "post-merge cleanup",
           "post merge cleanup",
+          "cleanup worktrees",
+          "clean up worktrees",
           "cleanup merged worktree",
           "clean merged worktree",
-          "sweep merged worktrees",
-          "sweeper agent"
+          "sweep merged worktrees"
         ],
         "intentPatterns": [],
         "excludePatterns": [
-          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|skip|avoid)\\b[^.;\\n]{0,80}\\b(?:post[- ]merge cleanup|(?:cleanup|clean|sweep) merged worktrees?|sweeper agent)\\b[^.;\\n]*(?=[.;\\n]|\\Z)"
+          "(?is)(?:\\A|[.;\\n]\\s*)[^.;\\n]{0,80}\\b(?:do not|don't|never|skip|avoid)\\b[^.;\\n]{0,80}\\b(?:post[- ]merge cleanup|(?:cleanup|clean up) worktrees|(?:cleanup|clean|sweep) merged worktrees?)\\b[^.;\\n]*(?=[.;\\n]|\\Z)"
         ]
       },
       "fileTriggers": {

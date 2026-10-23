@@ -2,10 +2,13 @@
   "version": "1.0",
   "description": "Offline routing fixtures for the public activation registry.",
   "positive": {
-    "Run post-merge cleanup for the merged worktree": [
+    "cleanup worktrees": [
       "post-merge-cleanup"
     ],
-    "Spawn the sweeper agent for this task worktree": [
+    "clean up worktrees": [
+      "post-merge-cleanup"
+    ],
+    "Run post-merge cleanup for the merged worktree": [
       "post-merge-cleanup"
     ],
     "Please clean merged worktree now": [
@@ -321,6 +324,9 @@
     ]
   },
   "negative": [
+    "Use the sweeper agent to inspect the PlanOps ledger.",
+    "Do not cleanup worktrees.",
+    "Do not clean up worktrees.",
     "Do not run post-merge cleanup.",
     "The PR was merged; leave the worktree alone.",
     "Explain multi-agent systems and their history",
