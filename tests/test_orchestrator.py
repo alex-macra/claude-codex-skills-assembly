@@ -248,7 +248,7 @@ class AgentTests(unittest.TestCase):
     def test_retired_agents_are_gone(self) -> None:
         self.assertFalse((AGENTS_DIR / "qa.md").exists())
         self.assertFalse((AGENTS_DIR / "shipper.md").exists())
-        self.assertEqual(sorted(path.name for path in AGENTS_DIR.glob("*.md")), ["orchestrator.md", "reviewer.md"])
+        self.assertEqual(sorted(path.name for path in AGENTS_DIR.glob("*.md")), ["cleaner.md", "orchestrator.md", "reviewer.md"])
 
     def test_agents_describe_cross_host_skill_loading_truthfully(self) -> None:
         for path in (ORCHESTRATOR_AGENT, REVIEWER_AGENT):

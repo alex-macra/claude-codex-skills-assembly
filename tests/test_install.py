@@ -66,8 +66,8 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(second[0], 0, second)
         for home in self.user_env.values():
             skills = Path(home) / "skills"
-            self.assertEqual(len(list(skills.iterdir())), 10)
-        self.assertEqual(len(list((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents").iterdir())), 2)
+            self.assertEqual(len(list(skills.iterdir())), 11)
+        self.assertEqual(len(list((Path(self.user_env["CLAUDE_CONFIG_DIR"]) / "agents").iterdir())), 3)
         self.assertFalse((Path(self.user_env["CODEX_HOME"]) / "agents").exists())
         self.assertFalse((Path(self.user_env["AGENTS_HOME"]) / "agents").exists())
 
@@ -102,7 +102,7 @@ class InstallerTests(unittest.TestCase):
 
         for surface in (".claude", ".codex", ".agents"):
             links = list((project / surface / "skills").glob("*/SKILL.md"))
-            self.assertEqual(len(links), 10, surface)
+            self.assertEqual(len(links), 11, surface)
             self.assertTrue(
                 (
                     project
@@ -759,7 +759,7 @@ class InstallerTests(unittest.TestCase):
         rules = json.loads(
             (project / ".claude" / "skills" / "skill-rules.json").read_text()
         )["skills"]
-        self.assertEqual(len(rules), 11)
+        self.assertEqual(len(rules), 12)
         self.assertIn("task-research", rules)
         self.assertIn("sample-overlay", rules)
 
@@ -1107,7 +1107,7 @@ class InstallerTests(unittest.TestCase):
         catalogs = installer.CatalogSet([ROOT / "catalog.json"], allow_missing_sources=True)
 
         self.assertEqual(("claude",), catalogs.agent_surfaces)
-        self.assertEqual({"orchestrator", "reviewer"}, set(catalogs.agents))
+        self.assertEqual({"cleaner", "orchestrator", "reviewer"}, set(catalogs.agents))
 
     def test_catalog_agent_surfaces_are_honored_and_codex_agents_pruned(self) -> None:
         catalog = self.overlay_catalog("agent-surfaces", surfaces={"agents": ["claude", "codex"]}, agents=True)

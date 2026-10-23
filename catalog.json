@@ -32,6 +32,9 @@
     "orchestrator": {
       "path": "skills/orchestrator"
     },
+    "post-merge-cleanup": {
+      "path": "skills/post-merge-cleanup"
+    },
     "qa-automation": {
       "path": "skills/qa-automation"
     },
@@ -49,6 +52,9 @@
     }
   },
   "agents": {
+    "cleaner": {
+      "path": "agents/cleaner.md"
+    },
     "orchestrator": {
       "path": "agents/orchestrator.md"
     },
@@ -70,6 +76,7 @@
         "delivery-loop",
         "fast-pr-workflow",
         "orchestrator",
+        "post-merge-cleanup",
         "qa-automation",
         "security-review",
         "see-it-live",
@@ -77,6 +84,7 @@
         "web-dev"
       ],
       "agents": [
+        "cleaner",
         "orchestrator",
         "reviewer"
       ],
