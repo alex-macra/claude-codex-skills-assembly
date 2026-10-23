@@ -1,7 +1,6 @@
 # AI Skills Assembly for Claude Code and Codex
 
 Reusable agent skills, deterministic activation, safety hooks, and installers for Claude Code and OpenAI Codex, with an agentskills.io-compatible skill surface.
-
 Version 1 supports Python 3.10 or newer on Linux and macOS.
 
 ## Catalog
@@ -11,6 +10,7 @@ Version 1 supports Python 3.10 or newer on Linux and macOS.
 | `delivery-loop` | skill | One approved packet becomes a verified, reviewed, smoked change with one open PR |
 | `fast-pr-workflow` | skill | The only commit, push, PR create, PR update, and merge procedure, with a scoped tool grant |
 | `orchestrator` | skill | Supervise delivery work: a loop in this session, a whole session, or other sessions |
+| `post-merge-cleanup` | skill | Verify a merged PR and remove only its clean, idle task worktree |
 | `task-research` | skill | Evidence brief before a plan or packet: prior art first, then docs, facts vs assumptions |
 | `qa-automation` | skill | Write, run, and fix tests: unit, integration, and browser, CLI, and HTTP end-to-end |
 | `see-it-live` | skill | Run the app, prove the specific change is visible, smoke the critical path |
@@ -20,6 +20,7 @@ Version 1 supports Python 3.10 or newer on Linux and macOS.
 | `web-dev` | skill | TypeScript and Python web rules with frontend, backend, deploy and CI, and accessibility references |
 | `reviewer` | agent | Read-only review that preloads the three review skills |
 | `orchestrator` | agent | Supervisor role for a dedicated session or a background subagent |
+| `cleaner` | agent | Post-merge worktree cleanup after exact PR, head, and worktree checks |
 
 ## Install
 
@@ -62,13 +63,13 @@ The activation hook emits matching skill names from `routing/skill-rules.json`, 
 
 An optional task tracker is an executable at `~/.config/ai-skills/task-tracker`. When it exists and the packet names a task ID, the loop reports claims, checkpoints, and the review through it; otherwise the handoff says `tracker: none`. The contract is in `skills/delivery-loop/references/tracker.md`.
 
-For several packets, a milestone, or a long loop, `orchestrator` conducts builders and keeps one rolling PR per repository. It can also watch a whole session or other sessions; it never edits the watched tree and never merges.
+For several packets, a milestone, or a long loop, `orchestrator` conducts builders and keeps one rolling PR per repository. It can also watch a whole session or other sessions; it never edits the watched tree and never merges. After a separately authorized merge, request `post-merge cleanup` or `cleanup worktrees` to dispatch the cleaner. It verifies the merged PR against the fetched base and removes only the matching clean, idle task worktree. It leaves branches and other worktrees intact; the delivery loop still stops at an open PR.
 
 Delivery runs can keep optional resumable state under `.codex/delivery-state/`. The executable `scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks or accepting hard links; state adds no phases and grants no authority. The nonblocking browser helper coordinates test execution through a stable system directory lease, with one suite and one worker by default.
 
 ## Agent portability
 
-Agent files install on the Claude Code surface only (`surfaces.agents` in `catalog.json`), where Claude Code preloads the skills an agent declares. Codex takes roles inline: a Codex dispatcher names the `SKILL.md` files each subagent must read completely before acting.
+Agent files install on the Claude Code surface only (`surfaces.agents` in `catalog.json`), where Claude Code preloads the skills an agent declares. Codex takes roles inline: a Codex dispatcher names the `SKILL.md` files each subagent must read completely before acting. For cleanup, dispatch a cleaner subagent with `skills/post-merge-cleanup/SKILL.md`; an existing native Codex cleaner can use the same skill.
 
 ## Output styles
 
