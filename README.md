@@ -65,7 +65,7 @@ An optional task tracker is an executable at `~/.config/ai-skills/task-tracker`.
 
 For several packets, a milestone, or a long loop, `orchestrator` conducts builders and keeps one rolling PR per repository. It can also watch a whole session or other sessions; it never edits the watched tree and never merges. After a separately authorized merge, request `post-merge cleanup` or `cleanup worktrees` to dispatch the cleaner. It verifies the merged PR against the fetched base and removes only the matching clean, idle task worktree. It leaves branches and other worktrees intact; the delivery loop still stops at an open PR.
 
-Delivery runs can keep optional resumable state under `.codex/delivery-state/`. The executable `scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks or accepting hard links; state adds no phases and grants no authority. The nonblocking browser helper coordinates test execution through a stable system directory lease, with one suite and one worker by default.
+Delivery runs can keep optional resumable state under `.codex/delivery-state/`. The executable `skills/delivery-loop/scripts/delivery-state.py` helper creates and verifies private ignored state without following symlinks or accepting hard links; state adds no phases and grants no authority. The nonblocking `skills/delivery-loop/scripts/browser-suite-lease.py` helper coordinates test execution through a stable system directory lease, with one suite and one worker by default.
 
 ## Agent portability
 
